@@ -193,12 +193,14 @@
 
     .hero-title {
       font-family: var(--font-display);
-      font-size: clamp(5rem, 14vw, 11rem);
-      line-height: 0.9;
-      letter-spacing: 0.02em;
+      font-size: clamp(5rem, 22vw, 18rem);
+      line-height: 0.85;
+      letter-spacing: -0.01em;
       position: relative;
       z-index: 1;
       animation: fade-up 0.7s 0.1s ease both;
+      width: 100%;
+      text-align: center;
     }
 
     .hero-title .mix { color: var(--white); }
@@ -256,15 +258,118 @@
       animation: fade-up 0.7s 0.35s ease both;
     }
 
+    /* ─── HERO VIDEO ────────────────────────────────────── */
+    .hero-video-wrap {
+      width: 100%;
+      max-width: 900px;
+      margin: 2rem auto;
+      position: relative;
+      z-index: 1;
+      animation: fade-up 0.7s 0.35s ease both;
+    }
+
+    .hero-video-inner {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: var(--charcoal);
+      border: 1px solid var(--border);
+      clip-path: polygon(0 0, calc(100% - 24px) 0, 100% 24px, 100% 100%, 24px 100%, 0 calc(100% - 24px));
+      overflow: hidden;
+    }
+
+    .hero-video-inner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(155,89,255,0.12), rgba(0,212,255,0.08));
+    }
+
+    /* Animated scan line effect */
+    .hero-video-inner::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      animation: scan 3s linear infinite;
+      opacity: 0.5;
+    }
+
+    @keyframes scan {
+      0%   { top: 0%; }
+      100% { top: 100%; }
+    }
+
+    .hero-video-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      z-index: 1;
+    }
+
+    .video-play-icon {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      border: 2px solid rgba(0,212,255,0.4);
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,212,255,0.08);
+      transition: all 0.3s;
+    }
+
+    .video-play-icon svg {
+      width: 28px; height: 28px;
+      fill: var(--cyan);
+      margin-left: 4px;
+    }
+
+    .hero-video-inner:hover .video-play-icon {
+      border-color: var(--cyan);
+      background: rgba(0,212,255,0.18);
+      transform: scale(1.1);
+    }
+
+    .video-placeholder-text {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* Corner accents */
+    .video-corner {
+      position: absolute;
+      width: 20px; height: 20px;
+      z-index: 2;
+    }
+    .video-corner.tl { top: 8px; left: 8px; border-top: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+    .video-corner.tr { top: 8px; right: 8px; border-top: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+    .video-corner.bl { bottom: 8px; left: 8px; border-bottom: 2px solid var(--cyan); border-left: 2px solid var(--cyan); }
+    .video-corner.br { bottom: 8px; right: 8px; border-bottom: 2px solid var(--cyan); border-right: 2px solid var(--cyan); }
+
+    /* When real video is added */
+    .hero-video-inner video {
+      position: absolute;
+      inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+
     .hero-actions {
       display: flex;
       gap: 1rem;
-      margin-top: 2.5rem;
+      margin-top: 0.5rem;
       flex-wrap: wrap;
       justify-content: center;
       position: relative;
       z-index: 1;
-      animation: fade-up 0.7s 0.45s ease both;
+      animation: fade-up 0.7s 0.5s ease both;
     }
 
     .btn-primary {
@@ -735,11 +840,22 @@
 
     <p class="hero-subtitle">Wrestling</p>
 
-    <div class="belt-divider"></div>
-
-    <p class="hero-tagline">
-      Hard hits. Heavy drops. Independent pro wrestling that hits different.
-    </p>
+    <!-- ── HIGHLIGHT VIDEO ── -->
+    <div class="hero-video-wrap">
+      <div class="hero-video-inner">
+        <!-- Replace this comment with: <video src="/videos/highlight.mp4" autoplay muted loop playsinline></video> -->
+        <div class="hero-video-placeholder">
+          <div class="video-play-icon">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+          <p class="video-placeholder-text">Highlight Reel — Coming Soon</p>
+        </div>
+        <div class="video-corner tl"></div>
+        <div class="video-corner tr"></div>
+        <div class="video-corner bl"></div>
+        <div class="video-corner br"></div>
+      </div>
+    </div>
 
     <div class="hero-actions">
       <a href="/events" class="btn-primary">Get Tickets</a>
@@ -757,7 +873,7 @@
     <div class="event-card">
       <p class="section-label">⚡ Next Event</p>
       <h2 class="event-title">
-        <span class="holo-text">VOL. 1 - Press Play</span>
+        <span class="holo-text">SETLIST VOL. 2</span>
       </h2>
       <div class="event-meta">
         <span>📅 Coming Soon</span>
