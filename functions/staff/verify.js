@@ -1,9 +1,10 @@
 export async function onRequestGet(context) {
-  const cookie = context.request.headers.get('cookie') || '';
-  const authed = cookie.includes('mx_staff=true');
+  try {
+    const cookie = context.request.headers.get('cookie') || '';
+    const authed = cookie.includes('mx_staff=true');
 
-  if (!authed) {
-    const html = `<!DOCTYPE html>
+    if (!authed) {
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -47,7 +48,7 @@ export async function onRequestGet(context) {
     function check() {
       var val = document.getElementById('pin').value.trim();
       if (val === 'MIXTAPE2026') {
-        document.cookie = 'mx_staff=true; path=/staff; max-age=43200';
+        document.cookie = 'mx_staff=true; path=/; max-age=43200';
         window.location.reload();
       } else {
         document.getElementById('err').classList.add('show');
@@ -57,55 +58,55 @@ export async function onRequestGet(context) {
   </script>
 </body>
 </html>`;
-    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
-  }
-
-  const url = new URL(context.request.url);
-  const ticketUid = url.searchParams.get('t') || '';
-  const db = context.env.DB;
-
-  let result = null;
-  let ticket = null;
-
-  if (ticketUid) {
-    ticket = await db
-      .prepare("SELECT t.*, tt.name as tier_name, e.name as event_name FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id JOIN events e ON t.event_id = e.id WHERE t.ticket_uid = ?")
-      .bind(ticketUid)
-      .first();
-
-    if (!ticket) {
-      result = 'invalid';
-    } else if (ticket.used) {
-      result = 'used';
-    } else {
-      await db.prepare("UPDATE tickets SET used = 1 WHERE ticket_uid = ?").bind(ticketUid).run();
-      result = 'valid';
+      return new Response(html, { headers: { 'Content-Type': 'text/html' } });
     }
-  }
 
-  const statusHTML = result === 'valid' ? `
-    <div class="status valid">
-      <div class="status-icon">✓</div>
-      <div class="status-title">Valid — Check In</div>
-      <div class="status-tier">${ticket.tier_name}</div>
-      <div class="status-name">${ticket.customer_name}</div>
-      <div class="status-event">${ticket.event_name}</div>
-    </div>` :
-    result === 'used' ? `
-    <div class="status used">
-      <div class="status-icon">✕</div>
-      <div class="status-title">Already Scanned</div>
-      <div class="status-tier">${ticket.tier_name}</div>
-      <div class="status-name">${ticket.customer_name}</div>
-    </div>` :
-    result === 'invalid' ? `
-    <div class="status invalid">
-      <div class="status-icon">?</div>
-      <div class="status-title">Invalid Ticket</div>
-      <div class="status-sub">This ticket does not exist</div>
-    </div>` : '';
+    const url = new URL(context.request.url);
+    const ticketUid = url.searchParams.get('t') || '';
+    const db = context.env.DB;
 
-  const html = `<!DOCTYPE html>
+    let result = null;
+    let ticket = null;
+
+    if (ticketUid && db) {
+      ticket = await db
+        .prepare("SELECT t.*, tt.name as tier_name, e.name as event_name FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id JOIN events e ON t.event_id = e.id WHERE t.ticket_uid = ?")
+        .bind(ticketUid)
+        .first();
+
+      if (!ticket) {
+        result = 'invalid';
+      } else if (ticket.used) {
+        result = 'used';
+      } else {
+        await db.prepare("UPDATE tickets SET used = 1 WHERE ticket_uid = ?").bind(ticketUid).run();
+        result = 'valid';
+      }
+    }
+
+    const statusHTML = result === 'valid' ? `
+      <div class="status valid">
+        <div class="status-icon">✓</div>
+        <div class="status-title">Valid — Check In</div>
+        <div class="status-tier">${ticket.tier_name}</div>
+        <div class="status-name">${ticket.customer_name}</div>
+        <div class="status-event">${ticket.event_name}</div>
+      </div>` :
+      result === 'used' ? `
+      <div class="status used">
+        <div class="status-icon">✕</div>
+        <div class="status-title">Already Scanned</div>
+        <div class="status-tier">${ticket.tier_name}</div>
+        <div class="status-name">${ticket.customer_name}</div>
+      </div>` :
+      result === 'invalid' ? `
+      <div class="status invalid">
+        <div class="status-icon">?</div>
+        <div class="status-title">Invalid Ticket</div>
+        <div class="status-sub">This ticket does not exist</div>
+      </div>` : '';
+
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -182,5 +183,9 @@ export async function onRequestGet(context) {
 </body>
 </html>`;
 
-  return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+    return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+
+  } catch(err) {
+    return new Response('Error: ' + err.message, { status: 500 });
+  }
 }
