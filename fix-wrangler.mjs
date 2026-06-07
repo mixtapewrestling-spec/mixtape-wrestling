@@ -3,14 +3,13 @@ import { readFileSync, writeFileSync } from 'fs';
 const path = './dist/server/wrangler.json';
 const config = JSON.parse(readFileSync(path, 'utf-8'));
 
-// Remove everything Pages doesn't support
 delete config.kv_namespaces;
 delete config.assets;
 delete config.main;
 delete config.rules;
-delete config.pages_build_output_dir;
 
-// Add our D1 binding
+config.pages_build_output_dir = '../client';
+
 config.d1_databases = [{
   binding: 'DB',
   database_name: 'mixtape-tickets',
