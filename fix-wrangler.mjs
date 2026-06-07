@@ -1,9 +1,18 @@
-import { readFileSync, writeFileSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync } from 'fs';
+import { join } from 'path';
 
-// Copy the worker entry point to where Pages expects it
+// Copy _worker.js
 copyFileSync('./dist/server/entry.mjs', './dist/client/_worker.js');
 
-// Read and patch the wrangler.json
+// Copy all chunks
+const chunksDir = './dist/server/chunks';
+const destChunks = './dist/client/chunks';
+mkdirSync(destChunks, { recursive: true });
+readdirSync(chunksDir).forEach(file => {
+  copyFileSync(join(chunksDir, file), join(destChunks, file));
+});
+
+// Patch wrangler.json
 const path = './dist/server/wrangler.json';
 const config = JSON.parse(readFileSync(path, 'utf-8'));
 
@@ -13,7 +22,6 @@ delete config.main;
 delete config.rules;
 
 config.pages_build_output_dir = '../client';
-
 config.d1_databases = [{
   binding: 'DB',
   database_name: 'mixtape-tickets',
@@ -21,4 +29,4 @@ config.d1_databases = [{
 }];
 
 writeFileSync(path, JSON.stringify(config, null, 2));
-console.log('wrangler.json patched and _worker.js copied successfully');
+console.log('Done: _worker.js, chunks, and wrangler.json all patched');
