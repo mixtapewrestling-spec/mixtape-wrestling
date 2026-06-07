@@ -68,7 +68,7 @@ export async function onRequestGet(context) {
     let result = null;
     let ticket = null;
 
-    if (ticketUid && db) {
+    if (ticketUid) { if (!db) { return new Response("DB not available", { status: 500 }); }
       ticket = await db
         .prepare("SELECT t.*, tt.name as tier_name, e.name as event_name FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id JOIN events e ON t.event_id = e.id WHERE t.ticket_uid = ?")
         .bind(ticketUid)
