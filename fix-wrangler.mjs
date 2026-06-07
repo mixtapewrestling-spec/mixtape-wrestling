@@ -14,27 +14,29 @@ function copyDir(src, dest) {
   });
 }
 
+function patchConfig(path) {
+  const config = JSON.parse(readFileSync(path, 'utf-8'));
+  delete config.kv_namespaces;
+  delete config.assets;
+  delete config.main;
+  delete config.rules;
+  config.d1_databases = [{
+    binding: 'DB',
+    database_name: 'mixtape-tickets',
+    database_id: 'db53921c-0d35-4db7-a5a9-65e3137b90f4',
+  }];
+  config.pages_build_output_dir = '.';
+  writeFileSync(path, JSON.stringify(config, null, 2));
+}
+
 // Copy everything from server to client
 copyDir('./dist/server', './dist/client');
 
 // Rename entry.mjs to _worker.js
 copyFileSync('./dist/client/entry.mjs', './dist/client/_worker.js');
 
-// Patch wrangler.json
-const path = './dist/client/wrangler.json';
-const config = JSON.parse(readFileSync(path, 'utf-8'));
+// Patch BOTH wrangler.json files
+patchConfig('./dist/server/wrangler.json');
+patchConfig('./dist/client/wrangler.json');
 
-delete config.kv_namespaces;
-delete config.assets;
-delete config.main;
-delete config.rules;
-
-config.pages_build_output_dir = '.';
-config.d1_databases = [{
-  binding: 'DB',
-  database_name: 'mixtape-tickets',
-  database_id: 'db53921c-0d35-4db7-a5a9-65e3137b90f4',
-}];
-
-writeFileSync(path, JSON.stringify(config, null, 2));
-console.log('Done: all server files copied to client, _worker.js ready');
+console.log('Done!');
