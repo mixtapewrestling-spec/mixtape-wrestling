@@ -167,7 +167,7 @@ export async function onRequestGet(context) {
       </div>
     </div>
     ${statusHTML}
-    ${result ? '<a href="/staff/verify" class="clear-btn">← Scan Next Ticket</a>' : ''}
+    ${result ? '<a href="/staff-verify" class="clear-btn">← Scan Next Ticket</a>' : ''}
   </div>
   <script>
     document.getElementById('ticketInput').addEventListener('keydown', function(e) {
@@ -176,7 +176,7 @@ export async function onRequestGet(context) {
     function verify() {
       var val = document.getElementById('ticketInput').value.trim();
       if (!val) return;
-      window.location.href = '/staff/verify?t=' + encodeURIComponent(val);
+      window.location.href = '/staff-verify?t=' + encodeURIComponent(val);
     }
     ${!result ? "document.getElementById('ticketInput').focus();" : ''}
   </script>
