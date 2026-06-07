@@ -1,19 +1,27 @@
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
-// Copy _worker.js
-copyFileSync('./dist/server/entry.mjs', './dist/client/_worker.js');
+function copyDir(src, dest) {
+  mkdirSync(dest, { recursive: true });
+  readdirSync(src).forEach(file => {
+    const srcPath = join(src, file);
+    const destPath = join(dest, file);
+    if (statSync(srcPath).isDirectory()) {
+      copyDir(srcPath, destPath);
+    } else {
+      copyFileSync(srcPath, destPath);
+    }
+  });
+}
 
-// Copy all chunks
-const chunksDir = './dist/server/chunks';
-const destChunks = './dist/client/chunks';
-mkdirSync(destChunks, { recursive: true });
-readdirSync(chunksDir).forEach(file => {
-  copyFileSync(join(chunksDir, file), join(destChunks, file));
-});
+// Copy everything from server to client
+copyDir('./dist/server', './dist/client');
+
+// Rename entry.mjs to _worker.js
+copyFileSync('./dist/client/entry.mjs', './dist/client/_worker.js');
 
 // Patch wrangler.json
-const path = './dist/server/wrangler.json';
+const path = './dist/client/wrangler.json';
 const config = JSON.parse(readFileSync(path, 'utf-8'));
 
 delete config.kv_namespaces;
@@ -21,7 +29,7 @@ delete config.assets;
 delete config.main;
 delete config.rules;
 
-config.pages_build_output_dir = '../client';
+config.pages_build_output_dir = '.';
 config.d1_databases = [{
   binding: 'DB',
   database_name: 'mixtape-tickets',
@@ -29,4 +37,4 @@ config.d1_databases = [{
 }];
 
 writeFileSync(path, JSON.stringify(config, null, 2));
-console.log('Done: _worker.js, chunks, and wrangler.json all patched');
+console.log('Done: all server files copied to client, _worker.js ready');
