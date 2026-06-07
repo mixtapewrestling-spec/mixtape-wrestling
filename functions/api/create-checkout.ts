@@ -1,12 +1,7 @@
-export const prerender = false;
-
-import type { APIContext } from 'astro';
-
-export async function POST({ request, locals }: APIContext) {
-  const env = (locals as any).runtime?.env;
-
-  const STRIPE_SECRET_KEY: string = env?.STRIPE_SECRET_KEY ?? '';
-  const SITE_URL: string = env?.SITE_URL ?? 'https://mixtapewrestling.com';
+export async function onRequestPost(context: any) {
+  const env = context.env;
+  const STRIPE_SECRET_KEY = env?.STRIPE_SECRET_KEY ?? '';
+  const SITE_URL = env?.SITE_URL ?? 'https://mixtapewrestling.com';
 
   if (!STRIPE_SECRET_KEY) {
     return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
@@ -17,7 +12,7 @@ export async function POST({ request, locals }: APIContext) {
 
   let body: any;
   try {
-    body = await request.json();
+    body = await context.request.json();
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid request' }), {
       status: 400,
