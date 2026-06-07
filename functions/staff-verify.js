@@ -68,7 +68,7 @@ export async function onRequestGet(context) {
     let result = null;
     let ticket = null;
 
-    if (ticketUid) { if (!db) { return new Response("DB not available", { status: 500 }); }
+    if (ticketUid && db) {
       ticket = await db
         .prepare("SELECT t.*, tt.name as tier_name, e.name as event_name FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id JOIN events e ON t.event_id = e.id WHERE t.ticket_uid = ?")
         .bind(ticketUid)
@@ -85,7 +85,7 @@ export async function onRequestGet(context) {
     }
 
     const statusHTML = result === 'valid' ? `
-      <div class="status valid">
+      <div class="status valid" id="statusBox">
         <div class="status-icon">✓</div>
         <div class="status-title">Valid — Check In</div>
         <div class="status-tier">${ticket.tier_name}</div>
@@ -93,14 +93,14 @@ export async function onRequestGet(context) {
         <div class="status-event">${ticket.event_name}</div>
       </div>` :
       result === 'used' ? `
-      <div class="status used">
+      <div class="status used" id="statusBox">
         <div class="status-icon">✕</div>
         <div class="status-title">Already Scanned</div>
         <div class="status-tier">${ticket.tier_name}</div>
         <div class="status-name">${ticket.customer_name}</div>
       </div>` :
       result === 'invalid' ? `
-      <div class="status invalid">
+      <div class="status invalid" id="statusBox">
         <div class="status-icon">?</div>
         <div class="status-title">Invalid Ticket</div>
         <div class="status-sub">This ticket does not exist</div>
@@ -113,6 +113,7 @@ export async function onRequestGet(context) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Door Verify — miXtape Wrestling</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"><\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -126,13 +127,25 @@ export async function onRequestGet(context) {
     header { padding:1rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
     .logo { font-family:var(--font-display);font-size:1.6rem;letter-spacing:0.05em; }
     .staff-badge { font-family:var(--font-ui);font-size:0.65rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;color:var(--black);background:var(--cyan);padding:0.3rem 0.75rem; }
-    .wrap { max-width:500px;margin:0 auto;padding:2rem 1.5rem; }
+    .wrap { max-width:600px;margin:0 auto;padding:2rem 1.5rem; }
     .scan-box { background:var(--surface);border:1px solid var(--border);padding:1.5rem;margin-bottom:1.5rem;clip-path:polygon(0 0,calc(100% - 16px) 0,100% 16px,100% 100%,16px 100%,0 calc(100% - 16px)); }
     .scan-label { font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem; }
-    .scan-input-row { display:flex;gap:0.75rem; }
+    .scan-input-row { display:flex;gap:0.75rem;margin-bottom:0.75rem; }
     input { flex:1;background:var(--charcoal);border:1px solid var(--border);color:var(--white);font-family:var(--font-ui);font-size:1rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:0.75rem 1rem;outline:none;border-radius:0;-webkit-appearance:none; }
     input:focus { border-color:var(--cyan); }
-    .scan-btn { font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.75rem 1.25rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);white-space:nowrap; }
+    .scan-btn { font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.75rem 1.25rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);white-space:nowrap;transition:background 0.2s; }
+    .scan-btn:hover { background:var(--teal); }
+    .camera-btn { width:100%;font-family:var(--font-ui);font-size:0.9rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--white);background:rgba(155,89,255,0.2);border:1px solid #9b59ff;cursor:pointer;padding:0.85rem;display:flex;align-items:center;justify-content:center;gap:0.75rem;transition:background 0.2s; }
+    .camera-btn:hover { background:rgba(155,89,255,0.35); }
+    .camera-btn svg { width:20px;height:20px;flex-shrink:0; }
+    .camera-wrap { position:relative;width:100%;margin-top:1rem;display:none; }
+    .camera-wrap.active { display:block; }
+    video { width:100%;border:2px solid #9b59ff;display:block; }
+    canvas { display:none; }
+    .scan-line { position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:scanline 2s linear infinite;pointer-events:none; }
+    @keyframes scanline { 0% { top:0%; } 100% { top:100%; } }
+    .camera-status { font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-align:center;margin-top:0.5rem; }
+    .stop-btn { width:100%;margin-top:0.5rem;font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#ff6b6b;background:transparent;border:1px solid rgba(255,107,107,0.3);cursor:pointer;padding:0.6rem; }
     .status { padding:2rem;text-align:center;clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px)); }
     .status.valid { background:rgba(0,245,212,0.15);border:1px solid var(--teal); }
     .status.used { background:rgba(255,107,107,0.15);border:1px solid #ff6b6b; }
@@ -165,21 +178,97 @@ export async function onRequestGet(context) {
         <input type="text" id="ticketInput" placeholder="Ticket ID" autocomplete="off" autocorrect="off" autocapitalize="characters" />
         <button class="scan-btn" onclick="verify()">Verify</button>
       </div>
+      <button class="camera-btn" id="cameraBtn" onclick="startCamera()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        Scan QR Code with Camera
+      </button>
+      <div class="camera-wrap" id="cameraWrap">
+        <video id="video" playsinline autoplay muted></video>
+        <canvas id="canvas"></canvas>
+        <div class="scan-line"></div>
+        <p class="camera-status" id="cameraStatus">Point camera at QR code...</p>
+        <button class="stop-btn" onclick="stopCamera()">Stop Camera</button>
+      </div>
     </div>
     ${statusHTML}
     ${result ? '<a href="/staff-verify" class="clear-btn">← Scan Next Ticket</a>' : ''}
   </div>
   <script>
+    var stream = null;
+    var scanning = false;
+
     document.getElementById('ticketInput').addEventListener('keydown', function(e) {
       if (e.key === 'Enter') verify();
     });
+
     function verify() {
       var val = document.getElementById('ticketInput').value.trim();
       if (!val) return;
+      stopCamera();
       window.location.href = '/staff-verify?t=' + encodeURIComponent(val);
     }
+
+    function startCamera() {
+      var wrap = document.getElementById('cameraWrap');
+      var video = document.getElementById('video');
+      wrap.classList.add('active');
+      document.getElementById('cameraBtn').style.display = 'none';
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(function(s) {
+          stream = s;
+          video.srcObject = s;
+          scanning = true;
+          requestAnimationFrame(scanFrame);
+        })
+        .catch(function(err) {
+          document.getElementById('cameraStatus').textContent = 'Camera access denied — use manual entry above';
+        });
+    }
+
+    function stopCamera() {
+      scanning = false;
+      if (stream) {
+        stream.getTracks().forEach(function(t) { t.stop(); });
+        stream = null;
+      }
+      document.getElementById('cameraWrap').classList.remove('active');
+      document.getElementById('cameraBtn').style.display = 'flex';
+    }
+
+    function scanFrame() {
+      if (!scanning) return;
+      var video = document.getElementById('video');
+      var canvas = document.getElementById('canvas');
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        var code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          var qrData = code.data;
+          document.getElementById('cameraStatus').textContent = 'QR Code detected!';
+          stopCamera();
+          // Extract ticket UID from URL or use raw value
+          var uid = qrData;
+          var match = qrData.match(/[?&]t=([^&]+)/);
+          if (match) uid = decodeURIComponent(match[1]);
+          var pathMatch = qrData.match(/\/verify\/([a-zA-Z0-9-]+)/);
+          if (pathMatch) uid = pathMatch[1];
+          window.location.href = '/staff-verify?t=' + encodeURIComponent(uid);
+          return;
+        }
+      }
+      requestAnimationFrame(scanFrame);
+    }
+
     ${!result ? "document.getElementById('ticketInput').focus();" : ''}
-  </script>
+  <\/script>
 </body>
 </html>`;
 
