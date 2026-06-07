@@ -43,7 +43,7 @@ export async function onRequestGet(context) {
   // Generate QR codes
   const qrCodes = await Promise.all(
     tickets.map(uid =>
-      QRCode.toDataURL(`${SITE_URL}/verify/${uid}`, {
+      QRCode.toDataURL(`${SITE_URL}/staff-verify?t=${uid}`, {
         width: 300,
         margin: 2,
         color: { dark: '#00d4ff', light: '#0a0a0c' },
