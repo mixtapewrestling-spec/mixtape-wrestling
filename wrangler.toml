@@ -1,3 +1,8 @@
 name = "mixtape-wrestling"
 compatibility_date = "2024-04-03"
 pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mixtape-tickets"
+database_id = "db53921c-0d35-4db7-a5a9-65e3137b90f4"
