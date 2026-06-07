@@ -217,7 +217,7 @@ export async function onRequestGet(context) {
       wrap.classList.add('active');
       document.getElementById('cameraBtn').style.display = 'none';
 
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+     if (!navigator.mediaDevices) { document.getElementById('cameraStatus').textContent = 	'Camera not supported - use manual entry'; document.getElementById('cameraWrap').classList.add('active'); return; } navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(function(s) {
           stream = s;
           video.srcObject = s;
