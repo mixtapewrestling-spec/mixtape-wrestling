@@ -65,12 +65,17 @@ export const prerender = true;
     .tier-list{display:flex;flex-direction:column;gap:0.75rem;}
     .tier-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--charcoal);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));transition:border-color 0.2s;cursor:pointer;}
     .tier-row:hover{border-color:rgba(0,212,255,0.3);}
+    .tier-row.sold-out{opacity:0.5;cursor:not-allowed;pointer-events:none;}
     .tier-info{display:flex;flex-direction:column;gap:0.25rem;}
     .tier-name{font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.05em;}
-    .tier-avail{font-family:var(--font-ui);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--teal);}
+    .tier-avail{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;}
+    .tier-avail.in-stock{color:var(--teal);}
+    .tier-avail.almost-gone{color:#ff9f43;}
+    .tier-avail.sold-out{color:var(--muted);}
     .tier-price{font-family:var(--font-display);font-size:2rem;color:var(--cyan);letter-spacing:0.03em;text-align:right;min-width:80px;}
     .tier-select-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
     .tier-select-btn:hover{background:var(--teal);transform:translateY(-1px);}
+    .tier-select-btn.disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;}
     .ticket-sidebar{position:sticky;top:84px;}
     .ticket-widget{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,0 100%);overflow:hidden;}
     .ticket-widget-header{background:linear-gradient(135deg,rgba(0,212,255,0.12),rgba(155,89,255,0.08));border-bottom:1px solid var(--border);padding:1.5rem;}
@@ -217,20 +222,30 @@ export const prerender = true;
     let selectedTier = null;
     let qty = 1;
 
+    function getAvailLabel(capacity) {
+      if (capacity <= 0)  return { text: 'Sold Out!',    cls: 'sold-out' };
+      if (capacity <= 20) return { text: 'Almost Gone!', cls: 'almost-gone' };
+      return                     { text: 'In Stock',     cls: 'in-stock' };
+    }
+
     function buildTiers() {
       const list = document.getElementById('tierList');
       TIERS.forEach(function(t) {
         const price = (t.priceCents / 100).toFixed(2);
+        const avail = getAvailLabel(t.capacity);
+        const soldOut = t.capacity <= 0;
         const row = document.createElement('div');
-        row.className = 'tier-row';
+        row.className = 'tier-row' + (soldOut ? ' sold-out' : '');
         row.innerHTML =
           '<div class="tier-info">' +
             '<div class="tier-name">' + t.name + '</div>' +
-            '<div class="tier-avail">' + t.capacity + ' available</div>' +
+            '<div class="tier-avail ' + avail.cls + '">' + avail.text + '</div>' +
           '</div>' +
           '<div class="tier-price">$' + price + '</div>' +
-          '<button class="tier-select-btn">Select</button>';
-        row.addEventListener('click', function() { selectTier(t, row); });
+          '<button class="tier-select-btn' + (soldOut ? ' disabled' : '') + '">' + (soldOut ? 'Sold Out' : 'Select') + '</button>';
+        if (!soldOut) {
+          row.addEventListener('click', function() { selectTier(t, row); });
+        }
         list.appendChild(row);
       });
     }
@@ -239,7 +254,7 @@ export const prerender = true;
       document.querySelectorAll('.tier-row').forEach(function(r) { r.style.borderColor = ''; });
       selectedTier = t;
       el.style.borderColor = 'var(--cyan)';
-      const price = (t.priceCents / 100).toFixed(2);
+      var price = (t.priceCents / 100).toFixed(2);
       document.getElementById('selectedDisplay').classList.add('visible');
       document.getElementById('selectedName').textContent = t.name;
       document.getElementById('selectedPrice').textContent = '$' + price + ' per ticket';
@@ -250,7 +265,7 @@ export const prerender = true;
     }
 
     function changeQty(delta) {
-      const max = selectedTier ? Math.min(selectedTier.capacity, 8) : 8;
+      var max = selectedTier ? Math.min(selectedTier.capacity, 8) : 8;
       qty = Math.max(1, Math.min(max, qty + delta));
       document.getElementById('qtyDisplay').textContent = qty;
       updateSummary();
@@ -258,8 +273,8 @@ export const prerender = true;
 
     function updateSummary() {
       if (!selectedTier) return;
-      const price = (selectedTier.priceCents / 100).toFixed(2);
-      const total = (selectedTier.priceCents * qty / 100).toFixed(2);
+      var price = (selectedTier.priceCents / 100).toFixed(2);
+      var total = (selectedTier.priceCents * qty / 100).toFixed(2);
       document.getElementById('summaryTier').textContent = selectedTier.name;
       document.getElementById('summaryLinePrice').textContent = '$' + price;
       document.getElementById('summaryQty').textContent = qty;
@@ -270,16 +285,16 @@ export const prerender = true;
     document.getElementById('qtyPlus').addEventListener('click', function() { changeQty(1); });
 
     document.getElementById('checkoutBtn').addEventListener('click', async function() {
-      const name = document.getElementById('custName').value.trim();
-      const email = document.getElementById('custEmail').value.trim();
+      var name = document.getElementById('custName').value.trim();
+      var email = document.getElementById('custEmail').value.trim();
       if (!name || !email) { alert('Please enter your name and email address.'); return; }
       if (!email.includes('@')) { alert('Please enter a valid email address.'); return; }
       if (!selectedTier) return;
-      const btn = document.getElementById('checkoutBtn');
+      var btn = document.getElementById('checkoutBtn');
       btn.disabled = true;
       btn.textContent = 'Redirecting to Stripe...';
       try {
-        const res = await fetch('/api/create-checkout', {
+        var res = await fetch('/api/create-checkout', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -291,7 +306,7 @@ export const prerender = true;
             customerEmail: email,
           }),
         });
-        const data = await res.json();
+        var data = await res.json();
         if (data.url) { window.location.href = data.url; }
         else { throw new Error(data.error || 'Checkout failed'); }
       } catch(err) {
