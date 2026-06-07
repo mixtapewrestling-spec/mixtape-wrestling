@@ -55,7 +55,7 @@ export async function onRequestGet(context) {
         document.getElementById('pin').value = '';
       }
     }
-  </script>
+  <\/script>
 </body>
 </html>`;
       return new Response(html, { headers: { 'Content-Type': 'text/html' } });
@@ -113,7 +113,6 @@ export async function onRequestGet(context) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Door Verify — miXtape Wrestling</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"><\/script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -214,18 +213,52 @@ export async function onRequestGet(context) {
     function startCamera() {
       var wrap = document.getElementById('cameraWrap');
       var video = document.getElementById('video');
+      var status = document.getElementById('cameraStatus');
       wrap.classList.add('active');
       document.getElementById('cameraBtn').style.display = 'none';
 
-     if (!navigator.mediaDevices) { document.getElementById('cameraStatus').textContent = 	'Camera not supported - use manual entry'; document.getElementById('cameraWrap').classList.add('active'); return; } navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        status.textContent = 'Camera not supported — use manual entry above';
+        return;
+      }
+
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         .then(function(s) {
           stream = s;
           video.srcObject = s;
-          scanning = true;
-          requestAnimationFrame(scanFrame);
+          video.play();
+          status.textContent = 'Point camera at QR code...';
+
+          if ('BarcodeDetector' in window) {
+            var detector = new BarcodeDetector({ formats: ['qr_code'] });
+            scanning = true;
+            function detect() {
+              if (!scanning) return;
+              detector.detect(video).then(function(codes) {
+                if (codes.length > 0) {
+                  var qrData = codes[0].rawValue;
+                  status.textContent = 'QR Code detected!';
+                  stopCamera();
+                  var uid = qrData;
+                  var match = qrData.match(/[?&]t=([^&]+)/);
+                  if (match) uid = decodeURIComponent(match[1]);
+                  var pathMatch = qrData.match(/\/verify\/([a-zA-Z0-9-]+)/);
+                  if (pathMatch) uid = pathMatch[1];
+                  window.location.href = '/staff-verify?t=' + encodeURIComponent(uid);
+                } else {
+                  requestAnimationFrame(detect);
+                }
+              }).catch(function() { requestAnimationFrame(detect); });
+            }
+            detect();
+          } else {
+            status.textContent = 'QR scanning not supported — use manual entry above';
+          }
         })
         .catch(function(err) {
-          document.getElementById('cameraStatus').textContent = 'Camera access denied — use manual entry above';
+          status.textContent = 'Camera access denied — use manual entry above';
+          wrap.classList.remove('active');
+          document.getElementById('cameraBtn').style.display = 'flex';
         });
     }
 
@@ -237,34 +270,6 @@ export async function onRequestGet(context) {
       }
       document.getElementById('cameraWrap').classList.remove('active');
       document.getElementById('cameraBtn').style.display = 'flex';
-    }
-
-    function scanFrame() {
-      if (!scanning) return;
-      var video = document.getElementById('video');
-      var canvas = document.getElementById('canvas');
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        var ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var code = jsQR(imageData.data, imageData.width, imageData.height);
-        if (code) {
-          var qrData = code.data;
-          document.getElementById('cameraStatus').textContent = 'QR Code detected!';
-          stopCamera();
-          // Extract ticket UID from URL or use raw value
-          var uid = qrData;
-          var match = qrData.match(/[?&]t=([^&]+)/);
-          if (match) uid = decodeURIComponent(match[1]);
-          var pathMatch = qrData.match(/\/verify\/([a-zA-Z0-9-]+)/);
-          if (pathMatch) uid = pathMatch[1];
-          window.location.href = '/staff-verify?t=' + encodeURIComponent(uid);
-          return;
-        }
-      }
-      requestAnimationFrame(scanFrame);
     }
 
     ${!result ? "document.getElementById('ticketInput').focus();" : ''}
