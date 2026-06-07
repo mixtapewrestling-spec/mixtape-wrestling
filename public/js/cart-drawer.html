@@ -1,0 +1,27 @@
+<div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cartDrawer">
+  <div class="cart-drawer-header">
+    <div class="cart-drawer-title">Your Cart</div>
+    <button class="cart-close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-drawer-body">
+    <div class="cart-items" id="cartItems">
+      <p class="cart-empty">Your cart is empty</p>
+    </div>
+  </div>
+  <div class="cart-drawer-footer">
+    <div class="cart-field">
+      <label for="cartName">Full Name</label>
+      <input type="text" id="cartName" placeholder="Your name" autocomplete="name" />
+    </div>
+    <div class="cart-field">
+      <label for="cartEmail">Email Address</label>
+      <input type="email" id="cartEmail" placeholder="ticket@email.com" autocomplete="email" />
+    </div>
+    <div class="cart-total-row">
+      <span>Total</span>
+      <span id="cartTotal">$0.00</span>
+    </div>
+    <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="cartCheckout()">Checkout</button>
+  </div>
+</div>

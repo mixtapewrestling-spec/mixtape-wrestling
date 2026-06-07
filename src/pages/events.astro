@@ -10,6 +10,7 @@ export const prerender = true;
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/js/cart.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -44,6 +45,7 @@ export const prerender = true;
     .nav-links{display:flex;gap:2rem;list-style:none;}
     .nav-links a{font-family:var(--font-ui);font-size:0.95rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
     .nav-links a:hover,.nav-links a.active{color:var(--cyan);}
+    .nav-right{display:flex;align-items:center;gap:1rem;}
     .nav-cta{font-family:var(--font-ui);font-size:0.85rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);padding:0.5rem 1.25rem;text-decoration:none;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;}
     .nav-cta:hover{background:var(--teal);transform:translateY(-1px);}
     .page-header{padding:8rem 2rem 3rem;text-align:center;position:relative;overflow:hidden;}
@@ -51,7 +53,7 @@ export const prerender = true;
     .page-header-glow{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(155,89,255,0.12) 0%,rgba(0,212,255,0.06) 40%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
     .page-eyebrow{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
     .page-title{font-family:var(--font-display);font-size:clamp(3rem,10vw,7rem);line-height:0.9;letter-spacing:0.02em;position:relative;z-index:1;}
-    .events-layout{max-width:1100px;margin:0 auto;padding:3rem 2rem 6rem;display:grid;grid-template-columns:1fr 380px;gap:3rem;align-items:start;}
+    .events-layout{max-width:1100px;margin:0 auto;padding:3rem 2rem 6rem;}
     .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;}
     .event-banner{background:linear-gradient(135deg,rgba(155,89,255,0.2),rgba(0,212,255,0.1));border-bottom:1px solid var(--border);padding:2.5rem 2rem;position:relative;overflow:hidden;}
     .event-banner::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.06) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
@@ -63,9 +65,8 @@ export const prerender = true;
     .event-body{padding:2rem;}
     .event-section-title{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.4em;text-transform:uppercase;color:var(--muted);margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
     .tier-list{display:flex;flex-direction:column;gap:0.75rem;}
-    .tier-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--charcoal);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));transition:border-color 0.2s;cursor:pointer;}
-    .tier-row:hover{border-color:rgba(0,212,255,0.3);}
-    .tier-row.sold-out{opacity:0.5;cursor:not-allowed;pointer-events:none;}
+    .tier-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--charcoal);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));transition:border-color 0.2s;}
+    .tier-row.sold-out{opacity:0.5;pointer-events:none;}
     .tier-info{display:flex;flex-direction:column;gap:0.25rem;}
     .tier-name{font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.05em;}
     .tier-avail{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;}
@@ -73,50 +74,14 @@ export const prerender = true;
     .tier-avail.almost-gone{color:#ff9f43;}
     .tier-avail.sold-out{color:var(--muted);}
     .tier-price{font-family:var(--font-display);font-size:2rem;color:var(--cyan);letter-spacing:0.03em;text-align:right;min-width:80px;}
-    .tier-select-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
-    .tier-select-btn:hover{background:var(--teal);transform:translateY(-1px);}
-    .tier-select-btn.disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;}
-    .ticket-sidebar{position:sticky;top:84px;}
-    .ticket-widget{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,0 100%);overflow:hidden;}
-    .ticket-widget-header{background:linear-gradient(135deg,rgba(0,212,255,0.12),rgba(155,89,255,0.08));border-bottom:1px solid var(--border);padding:1.5rem;}
-    .ticket-widget-title{font-family:var(--font-display);font-size:1.6rem;letter-spacing:0.05em;margin-bottom:0.25rem;}
-    .ticket-widget-sub{font-family:var(--font-ui);font-size:0.75rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);}
-    .ticket-widget-body{padding:1.5rem;}
-    .selected-tier-display{background:var(--charcoal);border:1px solid var(--border);padding:1rem 1.25rem;margin-bottom:1.25rem;display:none;}
-    .selected-tier-display.visible{display:block;}
-    .selected-label{font-family:var(--font-ui);font-size:0.65rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem;}
-    .selected-name{font-family:var(--font-display);font-size:1.6rem;letter-spacing:0.04em;color:var(--cyan);}
-    .selected-price{font-family:var(--font-ui);font-size:0.85rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-top:0.2rem;}
-    .qty-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
-    .qty-label{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
-    .qty-controls{display:flex;align-items:center;border:1px solid var(--border);}
-    .qty-btn{font-family:var(--font-ui);font-size:1.2rem;font-weight:700;width:36px;height:36px;background:var(--charcoal);border:none;color:var(--white);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.15s;}
-    .qty-btn:hover{background:rgba(0,212,255,0.1);color:var(--cyan);}
-    .qty-display{font-family:var(--font-display);font-size:1.4rem;letter-spacing:0.05em;width:48px;text-align:center;background:var(--surface);color:var(--white);border-left:1px solid var(--border);border-right:1px solid var(--border);line-height:36px;}
-    .order-summary{border:1px solid var(--border);padding:1rem 1.25rem;margin-bottom:1.25rem;display:none;}
-    .order-summary.visible{display:block;}
-    .summary-row{display:flex;justify-content:space-between;font-family:var(--font-ui);font-size:0.85rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);padding:0.3rem 0;}
-    .summary-row.total{border-top:1px solid var(--border);margin-top:0.5rem;padding-top:0.75rem;color:var(--white);}
-    .summary-row.total span:last-child{color:var(--cyan);font-family:var(--font-display);font-size:1.2rem;}
-    .field-group{display:flex;flex-direction:column;gap:0.75rem;margin-bottom:1.25rem;}
-    .field{display:flex;flex-direction:column;gap:0.35rem;}
-    .field label{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.25em;text-transform:uppercase;color:var(--muted);}
-    .field input{background:var(--charcoal);border:1px solid var(--border);color:var(--white);font-family:var(--font-body);font-size:0.95rem;padding:0.65rem 0.9rem;outline:none;transition:border-color 0.2s;border-radius:0;-webkit-appearance:none;}
-    .field input:focus{border-color:var(--cyan);}
-    .field input::placeholder{color:var(--muted);}
-    .checkout-btn{width:100%;font-family:var(--font-ui);font-size:1rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--black);background:linear-gradient(135deg,var(--cyan),var(--teal));border:none;cursor:pointer;padding:1rem 2rem;clip-path:polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 0 20px rgba(0,212,255,0.3);}
-    .checkout-btn:hover{transform:translateY(-2px);box-shadow:0 0 35px rgba(0,212,255,0.5);}
-    .checkout-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;box-shadow:none;}
-    .no-tier-msg{text-align:center;padding:2rem 1rem;font-family:var(--font-ui);font-size:0.9rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);}
-    .secure-note{display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-top:1rem;font-family:var(--font-ui);font-size:0.7rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);}
+    .tier-add-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
+    .tier-add-btn:hover{background:var(--teal);transform:translateY(-1px);}
     footer{border-top:1px solid var(--border);padding:3rem 2rem;text-align:center;}
     .footer-logo{font-family:var(--font-display);font-size:2.5rem;letter-spacing:0.05em;margin-bottom:1rem;}
     .footer-links{display:flex;justify-content:center;gap:2rem;list-style:none;margin-bottom:2rem;flex-wrap:wrap;}
     .footer-links a{font-family:var(--font-ui);font-size:0.8rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
     .footer-links a:hover{color:var(--cyan);}
     .footer-copy{font-family:var(--font-ui);font-size:0.75rem;letter-spacing:0.1em;color:var(--border);text-transform:uppercase;}
-    @keyframes fade-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-    @media(max-width:900px){.events-layout{grid-template-columns:1fr}.ticket-sidebar{position:static}}
     @media(max-width:768px){nav{padding:0 1.25rem}.nav-links{display:none}.tier-row{grid-template-columns:1fr auto;gap:0.75rem}.tier-price{display:none}}
   </style>
 </head>
@@ -129,7 +94,17 @@ export const prerender = true;
       <li><a href="/roster">Roster</a></li>
       <li><a href="/about">About</a></li>
     </ul>
-    <a href="/events" class="nav-cta">Get Tickets</a>
+    <div class="nav-right">
+      <button class="cart-icon-btn" onclick="openCart()" aria-label="Open cart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"></circle>
+          <circle cx="20" cy="21" r="1"></circle>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+        </svg>
+        <span class="cart-count">0</span>
+      </button>
+      <a href="/events" class="nav-cta">Get Tickets</a>
+    </div>
   </nav>
 
   <header class="page-header">
@@ -139,64 +114,20 @@ export const prerender = true;
   </header>
 
   <div class="events-layout">
-    <div>
-      <div class="event-main">
-        <div class="event-banner">
-          <p class="event-label">Next Event</p>
-          <h2 class="event-name"><span class="holo-text">Vol. 1 — Press Play</span></h2>
-          <div class="event-details">
-            <div class="event-detail">Date: <span>TBA</span></div>
-            <div class="event-detail">Venue: <span>TBA</span></div>
-          </div>
+    <div class="event-main">
+      <div class="event-banner">
+        <p class="event-label">Next Event</p>
+        <h2 class="event-name"><span class="holo-text">Vol. 1 — Press Play</span></h2>
+        <div class="event-details">
+          <div class="event-detail">Date: <span>TBA</span></div>
+          <div class="event-detail">Venue: <span>TBA</span></div>
         </div>
-        <div class="event-body">
-          <p class="event-section-title">Select Your Section</p>
-          <div class="tier-list" id="tierList"></div>
-        </div>
+      </div>
+      <div class="event-body">
+        <p class="event-section-title">Select Your Section</p>
+        <div class="tier-list" id="tierList"></div>
       </div>
     </div>
-
-    <aside class="ticket-sidebar">
-      <div class="ticket-widget">
-        <div class="ticket-widget-header">
-          <div class="ticket-widget-title"><span class="holo-text">Your Tickets</span></div>
-          <div class="ticket-widget-sub">Secure checkout via Stripe</div>
-        </div>
-        <div class="ticket-widget-body">
-          <div class="selected-tier-display" id="selectedDisplay">
-            <div class="selected-label">Selected Section</div>
-            <div class="selected-name" id="selectedName">—</div>
-            <div class="selected-price" id="selectedPrice">—</div>
-          </div>
-          <div class="qty-row">
-            <span class="qty-label">Quantity</span>
-            <div class="qty-controls">
-              <button class="qty-btn" id="qtyMinus">−</button>
-              <div class="qty-display" id="qtyDisplay">1</div>
-              <button class="qty-btn" id="qtyPlus">+</button>
-            </div>
-          </div>
-          <div class="order-summary" id="orderSummary">
-            <div class="summary-row"><span id="summaryTier">—</span><span id="summaryLinePrice">—</span></div>
-            <div class="summary-row"><span>Qty</span><span id="summaryQty">1</span></div>
-            <div class="summary-row total"><span>Total</span><span id="summaryTotal">—</span></div>
-          </div>
-          <div class="field-group">
-            <div class="field">
-              <label for="custName">Full Name</label>
-              <input type="text" id="custName" placeholder="Your name" autocomplete="name" />
-            </div>
-            <div class="field">
-              <label for="custEmail">Email Address</label>
-              <input type="email" id="custEmail" placeholder="ticket@email.com" autocomplete="email" />
-            </div>
-          </div>
-          <div class="no-tier-msg" id="noTierMsg">← Select a section to continue</div>
-          <button class="checkout-btn" id="checkoutBtn" disabled>Proceed to Payment</button>
-          <div class="secure-note">🔒 Secured by Stripe · Tickets emailed instantly</div>
-        </div>
-      </div>
-    </aside>
   </div>
 
   <footer>
@@ -211,6 +142,36 @@ export const prerender = true;
     <p class="footer-copy">© 2026 miXtape Wrestling. All rights reserved.</p>
   </footer>
 
+  <!-- Cart Drawer -->
+  <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+  <div class="cart-drawer" id="cartDrawer">
+    <div class="cart-drawer-header">
+      <div class="cart-drawer-title"><span class="holo-text">Your Cart</span></div>
+      <button class="cart-close-btn" onclick="closeCart()">✕</button>
+    </div>
+    <div class="cart-drawer-body">
+      <div class="cart-items" id="cartItems">
+        <p class="cart-empty">Your cart is empty</p>
+      </div>
+    </div>
+    <div class="cart-drawer-footer">
+      <div class="cart-field">
+        <label for="cartName">Full Name</label>
+        <input type="text" id="cartName" placeholder="Your name" autocomplete="name" />
+      </div>
+      <div class="cart-field">
+        <label for="cartEmail">Email Address</label>
+        <input type="email" id="cartEmail" placeholder="ticket@email.com" autocomplete="email" />
+      </div>
+      <div class="cart-total-row">
+        <span>Total</span>
+        <span id="cartTotal">$0.00</span>
+      </div>
+      <button class="cart-checkout-btn" id="cartCheckoutBtn" disabled onclick="cartCheckout()">Checkout</button>
+    </div>
+  </div>
+
+  <script src="/js/cart.js"></script>
   <script>
     const TIERS = [
       { id: 1, name: 'Ringside',          priceCents: 3500, stripePrice: 'price_1TfX1wAAiPqE8TkfHcv0trDs', capacity: 40 },
@@ -219,9 +180,6 @@ export const prerender = true;
       { id: 4, name: 'General Admission', priceCents: 2750, stripePrice: 'price_1TfX46AAiPqE8Tkf3VJZ85zN', capacity: 150 },
     ];
 
-    let selectedTier = null;
-    let qty = 1;
-
     function getAvailLabel(capacity) {
       if (capacity <= 0)  return { text: 'Sold Out!',    cls: 'sold-out' };
       if (capacity <= 20) return { text: 'Almost Gone!', cls: 'almost-gone' };
@@ -229,12 +187,12 @@ export const prerender = true;
     }
 
     function buildTiers() {
-      const list = document.getElementById('tierList');
+      var list = document.getElementById('tierList');
       TIERS.forEach(function(t) {
-        const price = (t.priceCents / 100).toFixed(2);
-        const avail = getAvailLabel(t.capacity);
-        const soldOut = t.capacity <= 0;
-        const row = document.createElement('div');
+        var price = (t.priceCents / 100).toFixed(2);
+        var avail = getAvailLabel(t.capacity);
+        var soldOut = t.capacity <= 0;
+        var row = document.createElement('div');
         row.className = 'tier-row' + (soldOut ? ' sold-out' : '');
         row.innerHTML =
           '<div class="tier-info">' +
@@ -242,79 +200,22 @@ export const prerender = true;
             '<div class="tier-avail ' + avail.cls + '">' + avail.text + '</div>' +
           '</div>' +
           '<div class="tier-price">$' + price + '</div>' +
-          '<button class="tier-select-btn' + (soldOut ? ' disabled' : '') + '">' + (soldOut ? 'Sold Out' : 'Select') + '</button>';
+          '<button class="tier-add-btn">' + (soldOut ? 'Sold Out' : 'Add to Cart') + '</button>';
         if (!soldOut) {
-          row.addEventListener('click', function() { selectTier(t, row); });
+          row.querySelector('.tier-add-btn').addEventListener('click', function() {
+            addToCart({
+              name: t.name,
+              category: 'Vol. 1 — Press Play',
+              priceCents: t.priceCents,
+              stripePrice: t.stripePrice,
+              tierId: t.id,
+              qty: 1,
+            });
+          });
         }
         list.appendChild(row);
       });
     }
-
-    function selectTier(t, el) {
-      document.querySelectorAll('.tier-row').forEach(function(r) { r.style.borderColor = ''; });
-      selectedTier = t;
-      el.style.borderColor = 'var(--cyan)';
-      var price = (t.priceCents / 100).toFixed(2);
-      document.getElementById('selectedDisplay').classList.add('visible');
-      document.getElementById('selectedName').textContent = t.name;
-      document.getElementById('selectedPrice').textContent = '$' + price + ' per ticket';
-      document.getElementById('noTierMsg').style.display = 'none';
-      document.getElementById('orderSummary').classList.add('visible');
-      document.getElementById('checkoutBtn').disabled = false;
-      updateSummary();
-    }
-
-    function changeQty(delta) {
-      var max = selectedTier ? Math.min(selectedTier.capacity, 8) : 8;
-      qty = Math.max(1, Math.min(max, qty + delta));
-      document.getElementById('qtyDisplay').textContent = qty;
-      updateSummary();
-    }
-
-    function updateSummary() {
-      if (!selectedTier) return;
-      var price = (selectedTier.priceCents / 100).toFixed(2);
-      var total = (selectedTier.priceCents * qty / 100).toFixed(2);
-      document.getElementById('summaryTier').textContent = selectedTier.name;
-      document.getElementById('summaryLinePrice').textContent = '$' + price;
-      document.getElementById('summaryQty').textContent = qty;
-      document.getElementById('summaryTotal').textContent = '$' + total;
-    }
-
-    document.getElementById('qtyMinus').addEventListener('click', function() { changeQty(-1); });
-    document.getElementById('qtyPlus').addEventListener('click', function() { changeQty(1); });
-
-    document.getElementById('checkoutBtn').addEventListener('click', async function() {
-      var name = document.getElementById('custName').value.trim();
-      var email = document.getElementById('custEmail').value.trim();
-      if (!name || !email) { alert('Please enter your name and email address.'); return; }
-      if (!email.includes('@')) { alert('Please enter a valid email address.'); return; }
-      if (!selectedTier) return;
-      var btn = document.getElementById('checkoutBtn');
-      btn.disabled = true;
-      btn.textContent = 'Redirecting to Stripe...';
-      try {
-        var res = await fetch('/api/create-checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            stripePriceId: selectedTier.stripePrice,
-            tierName: selectedTier.name,
-            tierId: selectedTier.id,
-            quantity: qty,
-            customerName: name,
-            customerEmail: email,
-          }),
-        });
-        var data = await res.json();
-        if (data.url) { window.location.href = data.url; }
-        else { throw new Error(data.error || 'Checkout failed'); }
-      } catch(err) {
-        alert('Something went wrong. Please try again.');
-        btn.disabled = false;
-        btn.textContent = 'Proceed to Payment';
-      }
-    });
 
     buildTiers();
   </script>
