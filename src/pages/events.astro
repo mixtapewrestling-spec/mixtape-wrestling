@@ -1,35 +1,6 @@
 ---
 export const prerender = true;
-
-const db = (Astro.locals as any).runtime?.env?.DB;
-
-let event: any = null;
-let ticketTypes: any[] = [];
-let soldCounts: Record<number, number> = {};
-
-if (db) {
-  event = await db
-    .prepare("SELECT * FROM events WHERE active = 1 ORDER BY id DESC LIMIT 1")
-    .first();
-
-  if (event) {
-    const types = await db
-      .prepare("SELECT * FROM ticket_types WHERE event_id = ?")
-      .bind(event.id)
-      .all();
-    ticketTypes = types.results ?? [];
-
-    for (const t of ticketTypes) {
-      const row: any = await db
-        .prepare("SELECT COUNT(*) as cnt FROM tickets WHERE ticket_type_id = ?")
-        .bind(t.id)
-        .first();
-      soldCounts[t.id] = row?.cnt ?? 0;
-    }
-  }
-}
 ---
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,7 +10,6 @@ if (db) {
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500&display=swap" rel="stylesheet" />
-
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -79,8 +49,8 @@ if (db) {
     .page-header{padding:8rem 2rem 3rem;text-align:center;position:relative;overflow:hidden;}
     .page-header::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.04) 1px,transparent 1px);background-size:60px 60px;mask-image:radial-gradient(ellipse 80% 80% at 50% 50%,black 30%,transparent 100%);pointer-events:none;}
     .page-header-glow{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(155,89,255,0.12) 0%,rgba(0,212,255,0.06) 40%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
-    .page-eyebrow{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;animation:fade-up 0.5s ease both;}
-    .page-title{font-family:var(--font-display);font-size:clamp(3rem,10vw,7rem);line-height:0.9;letter-spacing:0.02em;position:relative;z-index:1;animation:fade-up 0.5s 0.08s ease both;}
+    .page-eyebrow{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
+    .page-title{font-family:var(--font-display);font-size:clamp(3rem,10vw,7rem);line-height:0.9;letter-spacing:0.02em;position:relative;z-index:1;}
     .events-layout{max-width:1100px;margin:0 auto;padding:3rem 2rem 6rem;display:grid;grid-template-columns:1fr 380px;gap:3rem;align-items:start;}
     .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;}
     .event-banner{background:linear-gradient(135deg,rgba(155,89,255,0.2),rgba(0,212,255,0.1));border-bottom:1px solid var(--border);padding:2.5rem 2rem;position:relative;overflow:hidden;}
@@ -95,17 +65,12 @@ if (db) {
     .tier-list{display:flex;flex-direction:column;gap:0.75rem;}
     .tier-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--charcoal);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));transition:border-color 0.2s;cursor:pointer;}
     .tier-row:hover{border-color:rgba(0,212,255,0.3);}
-    .tier-row.sold-out{opacity:0.5;cursor:not-allowed;}
     .tier-info{display:flex;flex-direction:column;gap:0.25rem;}
     .tier-name{font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.05em;}
-    .tier-avail{font-family:var(--font-ui);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;}
-    .tier-avail.plenty{color:var(--teal);}
-    .tier-avail.low{color:#ff9f43;}
-    .tier-avail.sold{color:var(--muted);}
+    .tier-avail{font-family:var(--font-ui);font-size:0.75rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--teal);}
     .tier-price{font-family:var(--font-display);font-size:2rem;color:var(--cyan);letter-spacing:0.03em;text-align:right;min-width:80px;}
     .tier-select-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
     .tier-select-btn:hover{background:var(--teal);transform:translateY(-1px);}
-    .tier-select-btn:disabled{background:var(--border);color:var(--muted);cursor:not-allowed;transform:none;}
     .ticket-sidebar{position:sticky;top:84px;}
     .ticket-widget{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,0 100%);overflow:hidden;}
     .ticket-widget-header{background:linear-gradient(135deg,rgba(0,212,255,0.12),rgba(155,89,255,0.08));border-bottom:1px solid var(--border);padding:1.5rem;}
@@ -151,7 +116,6 @@ if (db) {
   </style>
 </head>
 <body>
-
   <nav>
     <a href="/" class="nav-logo"><span class="holo-text">miX</span><span style="color:var(--white)">tape</span></a>
     <ul class="nav-links">
@@ -182,8 +146,7 @@ if (db) {
         </div>
         <div class="event-body">
           <p class="event-section-title">Select Your Section</p>
-          <div class="tier-list" id="tierList">
-          </div>
+          <div class="tier-list" id="tierList"></div>
         </div>
       </div>
     </div>
@@ -203,9 +166,9 @@ if (db) {
           <div class="qty-row">
             <span class="qty-label">Quantity</span>
             <div class="qty-controls">
-              <button class="qty-btn" onclick="changeQty(-1)">−</button>
+              <button class="qty-btn" id="qtyMinus">−</button>
               <div class="qty-display" id="qtyDisplay">1</div>
-              <button class="qty-btn" onclick="changeQty(1)">+</button>
+              <button class="qty-btn" id="qtyPlus">+</button>
             </div>
           </div>
           <div class="order-summary" id="orderSummary">
@@ -224,7 +187,7 @@ if (db) {
             </div>
           </div>
           <div class="no-tier-msg" id="noTierMsg">← Select a section to continue</div>
-          <button class="checkout-btn" id="checkoutBtn" disabled id="checkoutBtn" onclick="window.startCheckout()">Proceed to Payment</button>
+          <button class="checkout-btn" id="checkoutBtn" disabled>Proceed to Payment</button>
           <div class="secure-note">🔒 Secured by Stripe · Tickets emailed instantly</div>
         </div>
       </div>
@@ -254,73 +217,60 @@ if (db) {
     let selectedTier = null;
     let qty = 1;
 
-    window.buildTiers = function() {
+    function buildTiers() {
       const list = document.getElementById('tierList');
-      TIERS.forEach(t => {
-        const remaining = t.capacity;
-        const isLow = remaining <= 10;
-        const availClass = isLow ? 'low' : 'plenty';
-        const availText = isLow ? `Only ${remaining} left` : `${remaining} available`;
+      TIERS.forEach(function(t) {
         const price = (t.priceCents / 100).toFixed(2);
         const row = document.createElement('div');
         row.className = 'tier-row';
-        row.dataset.tierId = t.id;
-        row.dataset.tierName = t.name;
-        row.dataset.tierPrice = t.priceCents;
-        row.dataset.stripePrice = t.stripePrice;
-        row.dataset.remaining = remaining;
-        row.innerHTML = `
-          <div class="tier-info">
-            <div class="tier-name">${t.name}</div>
-            <div class="tier-avail ${availClass}">${availText}</div>
-          </div>
-          <div class="tier-price">$${price}</div>
-          <button class="tier-select-btn">Select</button>
-        `;
-        row.addEventListener('click', () => selectTier(row));
+        row.innerHTML =
+          '<div class="tier-info">' +
+            '<div class="tier-name">' + t.name + '</div>' +
+            '<div class="tier-avail">' + t.capacity + ' available</div>' +
+          '</div>' +
+          '<div class="tier-price">$' + price + '</div>' +
+          '<button class="tier-select-btn">Select</button>';
+        row.addEventListener('click', function() { selectTier(t, row); });
         list.appendChild(row);
       });
     }
 
-    window.selectTier = function(el) {
-      document.querySelectorAll('.tier-row').forEach(r => r.style.borderColor = '');
-      selectedTier = {
-        id:          el.dataset.tierId,
-        name:        el.dataset.tierName,
-        priceCents:  parseInt(el.dataset.tierPrice),
-        stripePrice: el.dataset.stripePrice,
-        remaining:   parseInt(el.dataset.remaining),
-      };
+    function selectTier(t, el) {
+      document.querySelectorAll('.tier-row').forEach(function(r) { r.style.borderColor = ''; });
+      selectedTier = t;
       el.style.borderColor = 'var(--cyan)';
-      const price = (selectedTier.priceCents / 100).toFixed(2);
+      const price = (t.priceCents / 100).toFixed(2);
       document.getElementById('selectedDisplay').classList.add('visible');
-      document.getElementById('selectedName').textContent  = selectedTier.name;
-      document.getElementById('selectedPrice').textContent = `$${price} per ticket`;
-      document.getElementById('noTierMsg').style.display   = 'none';
+      document.getElementById('selectedName').textContent = t.name;
+      document.getElementById('selectedPrice').textContent = '$' + price + ' per ticket';
+      document.getElementById('noTierMsg').style.display = 'none';
       document.getElementById('orderSummary').classList.add('visible');
       document.getElementById('checkoutBtn').disabled = false;
       updateSummary();
     }
 
-    window.changeQty = function(delta) {
-      const max = selectedTier ? Math.min(selectedTier.remaining, 8) : 8;
+    function changeQty(delta) {
+      const max = selectedTier ? Math.min(selectedTier.capacity, 8) : 8;
       qty = Math.max(1, Math.min(max, qty + delta));
       document.getElementById('qtyDisplay').textContent = qty;
       updateSummary();
     }
 
-    window.updateSummary = function() {
+    function updateSummary() {
       if (!selectedTier) return;
       const price = (selectedTier.priceCents / 100).toFixed(2);
       const total = (selectedTier.priceCents * qty / 100).toFixed(2);
-      document.getElementById('summaryTier').textContent      = selectedTier.name;
-      document.getElementById('summaryLinePrice').textContent = `$${price}`;
-      document.getElementById('summaryQty').textContent       = qty;
-      document.getElementById('summaryTotal').textContent     = `$${total}`;
+      document.getElementById('summaryTier').textContent = selectedTier.name;
+      document.getElementById('summaryLinePrice').textContent = '$' + price;
+      document.getElementById('summaryQty').textContent = qty;
+      document.getElementById('summaryTotal').textContent = '$' + total;
     }
 
-    async window.startCheckout = async function() {
-      const name  = document.getElementById('custName').value.trim();
+    document.getElementById('qtyMinus').addEventListener('click', function() { changeQty(-1); });
+    document.getElementById('qtyPlus').addEventListener('click', function() { changeQty(1); });
+
+    document.getElementById('checkoutBtn').addEventListener('click', async function() {
+      const name = document.getElementById('custName').value.trim();
       const email = document.getElementById('custEmail').value.trim();
       if (!name || !email) { alert('Please enter your name and email address.'); return; }
       if (!email.includes('@')) { alert('Please enter a valid email address.'); return; }
@@ -334,25 +284,24 @@ if (db) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             stripePriceId: selectedTier.stripePrice,
-            tierName:      selectedTier.name,
-            tierId:        selectedTier.id,
-            quantity:      qty,
-            customerName:  name,
+            tierName: selectedTier.name,
+            tierId: selectedTier.id,
+            quantity: qty,
+            customerName: name,
             customerEmail: email,
           }),
         });
         const data = await res.json();
         if (data.url) { window.location.href = data.url; }
         else { throw new Error(data.error || 'Checkout failed'); }
-      } catch (err) {
+      } catch(err) {
         alert('Something went wrong. Please try again.');
         btn.disabled = false;
         btn.textContent = 'Proceed to Payment';
       }
-    }
+    });
 
     buildTiers();
   </script>
 </body>
 </html>
-
