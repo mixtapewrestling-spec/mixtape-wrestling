@@ -224,7 +224,7 @@ if (db) {
             </div>
           </div>
           <div class="no-tier-msg" id="noTierMsg">← Select a section to continue</div>
-          <button class="checkout-btn" id="checkoutBtn" disabled onclick="startCheckout()">Proceed to Payment</button>
+          <button class="checkout-btn" id="checkoutBtn" disabled id="checkoutBtn" onclick="window.startCheckout()">Proceed to Payment</button>
           <div class="secure-note">🔒 Secured by Stripe · Tickets emailed instantly</div>
         </div>
       </div>
@@ -254,7 +254,7 @@ if (db) {
     let selectedTier = null;
     let qty = 1;
 
-    function buildTiers() {
+    window.buildTiers = function() {
       const list = document.getElementById('tierList');
       TIERS.forEach(t => {
         const remaining = t.capacity;
@@ -282,7 +282,7 @@ if (db) {
       });
     }
 
-    function selectTier(el) {
+    window.selectTier = function(el) {
       document.querySelectorAll('.tier-row').forEach(r => r.style.borderColor = '');
       selectedTier = {
         id:          el.dataset.tierId,
@@ -302,14 +302,14 @@ if (db) {
       updateSummary();
     }
 
-    function changeQty(delta) {
+    window.changeQty = function(delta) {
       const max = selectedTier ? Math.min(selectedTier.remaining, 8) : 8;
       qty = Math.max(1, Math.min(max, qty + delta));
       document.getElementById('qtyDisplay').textContent = qty;
       updateSummary();
     }
 
-    function updateSummary() {
+    window.updateSummary = function() {
       if (!selectedTier) return;
       const price = (selectedTier.priceCents / 100).toFixed(2);
       const total = (selectedTier.priceCents * qty / 100).toFixed(2);
@@ -319,7 +319,7 @@ if (db) {
       document.getElementById('summaryTotal').textContent     = `$${total}`;
     }
 
-    async function startCheckout() {
+    async window.startCheckout = async function() {
       const name  = document.getElementById('custName').value.trim();
       const email = document.getElementById('custEmail').value.trim();
       if (!name || !email) { alert('Please enter your name and email address.'); return; }
