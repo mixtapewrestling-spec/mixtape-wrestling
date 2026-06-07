@@ -15,6 +15,7 @@
   "dependencies": {
     "@astrojs/cloudflare": "^13.6.1",
     "astro": "^6.4.4",
+    "qrcode": "^1.5.4",
     "wrangler": "^4.98.0"
   },
   "overrides": {
