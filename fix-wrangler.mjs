@@ -1,5 +1,9 @@
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, copyFileSync } from 'fs';
 
+// Copy the worker entry point to where Pages expects it
+copyFileSync('./dist/server/entry.mjs', './dist/client/_worker.js');
+
+// Read and patch the wrangler.json
 const path = './dist/server/wrangler.json';
 const config = JSON.parse(readFileSync(path, 'utf-8'));
 
@@ -17,4 +21,4 @@ config.d1_databases = [{
 }];
 
 writeFileSync(path, JSON.stringify(config, null, 2));
-console.log('wrangler.json patched successfully');
+console.log('wrangler.json patched and _worker.js copied successfully');
