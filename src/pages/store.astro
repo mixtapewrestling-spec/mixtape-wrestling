@@ -189,7 +189,10 @@ export const prerender = true;
             var imgHTML = p.image_url
               ? '<img src="' + p.image_url + '" alt="' + p.name + '" />'
               : '<span class="placeholder-icon">👕</span>';
-            var outOfStock = !p.in_stock;
+            var outOfStock = p.in_stock === 0 || p.stock_quantity === 0;
+            var lowStock = !outOfStock && p.stock_quantity > 0 && p.stock_quantity <= 10;
+            var stockLabel = outOfStock ? 'Sold Out' : (lowStock ? 'Almost Gone!' : 'In Stock');
+            var stockColor = outOfStock ? '#ff6b6b' : (lowStock ? '#ff9f43' : '#00f5d4');
             return '<div class="product-card">' +
               (outOfStock ? '<div class="product-tag">Sold Out</div>' : '') +
               '<div class="product-img">' + imgHTML + '</div>' +
