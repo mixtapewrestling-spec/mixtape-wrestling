@@ -6,3 +6,7 @@ pages_build_output_dir = "dist"
 binding = "DB"
 database_name = "mixtape-tickets"
 database_id = "db53921c-0d35-4db7-a5a9-65e3137b90f4"
+
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "mixtape-media"
