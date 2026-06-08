@@ -113,7 +113,7 @@ export async function onRequestPost(context) {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'miXtape Wrestling <onboarding@resend.dev>',
+            from: 'miXtape Wrestling <purchaseconfirmations@mixtapewrestling.com>',
             to: customerEmail,
             subject: hasTickets ? `Your tickets for ${ticketTiers[0] ? 'Vol. 1 — Press Play' : 'miXtape Wrestling'}` : 'Your miXtape Wrestling order',
             html: emailHtml,
