@@ -1,7 +1,7 @@
 export async function onRequestGet(context) {
   try {
     const db = context.env.DB;
-    const events = await db.prepare("SELECT * FROM events WHERE active = 1 ORDER BY CASE WHEN date IS NULL OR date = "" OR date = "TBA" THEN 1 ELSE 0 END, date ASC, id DESC").all();
+    const events = await db.prepare("SELECT * FROM events WHERE active = 1 ORDER BY CASE WHEN date IS NULL OR date = '' OR date = 'TBA' THEN 1 ELSE 0 END, date ASC, id DESC").all();
     const result = [];
     for (const event of events.results) {
       const types = await db.prepare("SELECT * FROM ticket_types WHERE event_id = ?").bind(event.id).all();
