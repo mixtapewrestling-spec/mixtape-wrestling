@@ -194,6 +194,7 @@ export const prerender = true;
               '<div class="product-img">' + imgHTML + '</div>' +
               '<div class="product-info">' +
                 '<p class="product-name">' + p.name + '</p>' +
+                '<p style="font-family:var(--font-ui);font-size:0.72rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:' + stockColor + ';margin-bottom:0.5rem">' + stockLabel + '</p>' +
                 (p.description ? '<p class="product-desc">' + p.description + '</p>' : '') +
                 '<div class="product-bottom">' +
                   '<p class="product-price">$' + price + '</p>' +
