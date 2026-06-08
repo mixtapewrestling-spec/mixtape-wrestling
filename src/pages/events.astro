@@ -222,7 +222,7 @@ export const prerender = true;
                 '<div class="poster-placeholder-sub">Poster Coming Soon</div>' +
               '</div>';
 
-          return '<div class="event-block">' +
+          return '<div style="display:grid;grid-template-columns:1fr 340px;gap:2rem;margin-bottom:3rem;align-items:start">' +
             '<div class="event-main">' +
               '<div class="event-banner">' +
                 '<p class="event-label">' + (idx === 0 ? 'Next Event' : 'Upcoming') + '</p>' +
