@@ -1,0 +1,22 @@
+{
+  "name": "miXtape Wrestling Staff",
+  "short_name": "miXtape Staff",
+  "description": "Door verification for miXtape Wrestling events",
+  "start_url": "/staff-verify",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#00d4ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
