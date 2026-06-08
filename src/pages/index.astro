@@ -395,8 +395,28 @@ export const prerender = true;
           }
         }
 
-        // Products — load from DB if available
-        // (placeholder cards stay until real products are added)
+        // Featured products on homepage
+        try {
+          var productsRes = await fetch('/api/products');
+          var products = await productsRes.json();
+          var featured = products.filter(function(p) { return p.featured === 1 || p.featured === '1'; });
+          if (featured.length > 0) {
+            var grid = document.getElementById('productsGrid');
+            grid.innerHTML = featured.map(function(p) {
+              var price = (p.price_cents / 100).toFixed(2);
+              var imgHTML = p.image_url
+                ? '<img src="' + p.image_url + '" alt="' + p.name + '" style="width:100%;height:100%;object-fit:cover;display:block;" />'
+                : '<span class="placeholder-icon">👕</span>';
+              return '<div class="product-card">' +
+                '<div class="product-img">' + imgHTML + '</div>' +
+                '<div class="product-info">' +
+                  '<p class="product-name">' + p.name + '</p>' +
+                  '<p class="product-price">$' + price + '</p>' +
+                '</div>' +
+              '</div>';
+            }).join('');
+          }
+        } catch(e) { console.log('Products error:', e); }
 
       } catch(err) {
         console.log('Could not load dynamic data:', err);

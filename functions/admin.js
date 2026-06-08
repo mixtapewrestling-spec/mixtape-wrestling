@@ -114,8 +114,9 @@ export async function onRequestPost(context) {
       const stripe_price_id = body.get('stripe_price_id') || '';
       const image_url = body.get('image_url') || '';
       const category = body.get('category') || 'merch';
-      await db.prepare("INSERT INTO products (name,description,price_cents,stripe_price_id,image_url,category,in_stock) VALUES (?,?,?,?,?,?,1)")
-        .bind(name, description, price, stripe_price_id, image_url, category).run();
+      const featured_a = body.get('featured') === '1' ? 1 : 0;
+      await db.prepare("INSERT INTO products (name,description,price_cents,stripe_price_id,image_url,category,in_stock,featured) VALUES (?,?,?,?,?,?,1,?)")
+        .bind(name, description, price, stripe_price_id, image_url, category, featured_a).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=store' } });
     }
 
@@ -127,8 +128,9 @@ export async function onRequestPost(context) {
       const stripe_price_id = body.get('stripe_price_id') || '';
       const image_url = body.get('image_url') || '';
       const in_stock = body.get('in_stock') === '1' ? 1 : 0;
-      await db.prepare("UPDATE products SET name=?,description=?,price_cents=?,stripe_price_id=?,image_url=?,in_stock=? WHERE id=?")
-        .bind(name, description, price, stripe_price_id, image_url, in_stock, id).run();
+      const featured_u = body.get('featured') === '1' ? 1 : 0;
+      await db.prepare("UPDATE products SET name=?,description=?,price_cents=?,stripe_price_id=?,image_url=?,in_stock=?,featured=? WHERE id=?")
+        .bind(name, description, price, stripe_price_id, image_url, in_stock, featured_u, id).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=store' } });
     }
 
@@ -611,6 +613,12 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
               <option value="0">Out of Stock</option>
             </select>
           </div>
+          <div class="form-group"><label>Featured on Homepage</label>
+            <select name="featured" id="productFeatured">
+              <option value="0">No</option>
+              <option value="1">Yes — show on homepage</option>
+            </select>
+          </div>
         </div>
         <button type="submit" class="save-btn">Save Product</button>
       </form>
@@ -642,7 +650,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       }
     }
 
-    function editProduct(id, name, desc, priceCents, stripe, image, inStock) {
+    function editProduct(id, name, desc, priceCents, stripe, image, inStock, featured) {
       document.getElementById('productModalTitle').textContent = 'Edit Product';
       document.getElementById('productForm').action = '/admin?action=update-product';
       document.getElementById('productId').value = id;
@@ -652,6 +660,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       document.getElementById('productStripe').value = stripe;
       document.getElementById('productImageUrl').value = image;
       document.getElementById('productStock').value = inStock;
+      document.getElementById('productFeatured').value = featured || 0;
       document.getElementById('addProductModal').classList.add('open');
     }
 
