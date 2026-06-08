@@ -139,7 +139,7 @@ export async function onRequestPost(context) {
     }
 
     if (action === 'save-settings') {
-      const keys = ['instagram','twitter','tiktok','contact_email','announcement_text','announcement_active'];
+      const keys = ['instagram','twitter','tiktok','contact_email','announcement_text','announcement_active','highlight_video'];
       for (const key of keys) {
         const val = body.get(key) || '';
         await db.prepare("INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)").bind(key, val).run();
@@ -461,11 +461,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
               <div class="upload-status" id="posterStatus"></div>
               ${currentEvent.poster_url ? `<img src="${currentEvent.poster_url}" style="width:80px;height:120px;object-fit:cover;border:1px solid var(--border);margin-top:.5rem" />` : ''}
             </div>
-            <div class="form-group" style="margin-bottom:1.25rem">
-              <label>Highlight Reel Video URL</label>
-              <input type="text" name="video_url" value="${currentEvent.video_url||''}" placeholder="YouTube or Vimeo URL" />
-              <div class="upload-status">Paste a YouTube or Vimeo URL — it will embed on the homepage</div>
-            </div>
+
             <button type="submit" class="save-btn">Save Event</button>
           </form>
           <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets? This cannot be undone.')">
@@ -542,6 +538,12 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
             <div class="form-row">
               <div class="form-group"><label>TikTok URL</label><input type="text" name="tiktok" value="${settings.tiktok||''}" placeholder="https://tiktok.com/..." /></div>
               <div class="form-group"><label>Contact Email</label><input type="text" name="contact_email" value="${settings.contact_email||''}" placeholder="info@mixtapewrestling.com" /></div>
+            </div>
+            <p class="section-title" style="margin-top:1.5rem">Homepage Video</p>
+            <div class="form-group" style="margin-bottom:1.5rem">
+              <label>Highlight Reel URL</label>
+              <input type="text" name="highlight_video" value="${settings.highlight_video||''}" placeholder="YouTube or Vimeo URL" />
+              <div class="upload-status" style="margin-top:.35rem">Paste a YouTube or Vimeo link — embeds as the homepage highlight reel</div>
             </div>
             <p class="section-title" style="margin-top:1.5rem">Announcement Banner</p>
             <div class="form-row">
