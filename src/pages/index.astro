@@ -338,7 +338,7 @@ export const prerender = true;
           var list = document.getElementById('eventsList');
           list.innerHTML = events.map(function(e) {
             var d = formatDate(e.date);
-            return '<a href="/events" class="event-row">' +
+            return '<a href="/events" class="event-row" style="display:grid;grid-template-columns:120px 1fr auto;align-items:center;gap:2rem;padding:1.5rem 2rem;background:var(--surface);border-bottom:1px solid var(--border);text-decoration:none;color:inherit;transition:background 0.2s">' +
               '<div class="event-date-block">' +
                 '<div class="event-date-day">' + d.day + '</div>' +
                 '<div class="event-date-month">' + d.month + '</div>' +
