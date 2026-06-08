@@ -164,6 +164,7 @@ export const prerender = true;
     </div>
   </nav>
 
+  <div class="announcement-bar" id="announcementBar"></div>
   <section class="hero">
     <div class="hero-glow"></div>
     <p class="hero-eyebrow">Independent Pro Wrestling</p>
@@ -351,6 +352,16 @@ export const prerender = true;
               '<div class="event-row-action">Get Tickets</div>' +
             '</a>';
           }).join('');
+        }
+
+        // Nav socials
+        var navSocials = document.getElementById('navSocials');
+        if (navSocials) {
+          var navLinks = [];
+          if (settings.instagram) navLinks.push('<a href="' + settings.instagram + '" target="_blank" style="font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-decoration:none">IG</a>');
+          if (settings.twitter) navLinks.push('<a href="' + settings.twitter + '" target="_blank" style="font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-decoration:none">X</a>');
+          if (settings.tiktok) navLinks.push('<a href="' + settings.tiktok + '" target="_blank" style="font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-decoration:none">TT</a>');
+          navSocials.innerHTML = navLinks.join('');
         }
 
         // Social links in footer
