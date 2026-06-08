@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
     const section = url.searchParams.get('s') || 'dashboard';
     const eventId = url.searchParams.get('event') || '';
 
-    const eventsRes = await db.prepare("SELECT * FROM events ORDER BY id DESC").all();
+    const eventsRes = await db.prepare("SELECT * FROM events ORDER BY CASE WHEN date IS NULL OR date = "" OR date = "TBA" THEN 1 ELSE 0 END, date ASC, id DESC").all();
     const events = eventsRes.results ?? [];
     const currentEvent = events.find(e => e.id == eventId) || events[0];
     const eid = currentEvent?.id || 1;
@@ -466,13 +466,12 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
               <input type="text" name="video_url" value="${currentEvent.video_url||''}" placeholder="YouTube or Vimeo URL" />
               <div class="upload-status">Paste a YouTube or Vimeo URL — it will embed on the homepage</div>
             </div>
-            <div style="display:flex;gap:1rem;align-items:center">
-              <button type="submit" class="save-btn">Save Event</button>
-              <form method="POST" action="/admin?action=delete-event" style="display:inline" onsubmit="return confirm('Delete this event and ALL its tickets? This cannot be undone.')">
-                <input type="hidden" name="id" value="${currentEvent.id}" />
-                <button type="submit" class="danger-btn">Delete Event</button>
-              </form>
-            </div>
+            <button type="submit" class="save-btn">Save Event</button>
+          </form>
+          <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets? This cannot be undone.')">
+            <input type="hidden" name="id" value="${currentEvent.id}" />
+            <button type="submit" class="danger-btn">Delete Event</button>
+          </form>
           </form>
         </div>
         <div class="card">
