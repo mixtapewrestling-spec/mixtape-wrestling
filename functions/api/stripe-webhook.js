@@ -82,7 +82,7 @@ export async function onRequestPost(context) {
       <p style="font-family:sans-serif;font-size:11px;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;color:#00d4ff;margin:0 0 8px">Order Confirmed</p>
       <h2 style="font-family:sans-serif;font-size:28px;font-weight:700;color:#f0f0f8;margin:0 0 16px">You're in, ${customerName}!</h2>
       <p style="font-family:sans-serif;font-size:15px;color:#8888aa;margin:0;line-height:1.6">
-        ${hasTickets ? 'Your tickets are below. Show the QR code at the door for entry.' : ''}
+        ${hasTickets ? 'Your tickets are below. Tap the button to view your QR code, then screenshot it or save the page to your phone for easy access at the door.' : ''}
         ${hasMerch ? 'Your merch order has been received and will be available for pickup or shipping.' : ''}
       </p>
     </div>
