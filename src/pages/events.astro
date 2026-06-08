@@ -54,7 +54,7 @@ export const prerender = true;
     .page-eyebrow{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
     .page-title{font-family:var(--font-display);font-size:clamp(3rem,10vw,7rem);line-height:0.9;letter-spacing:0.02em;position:relative;z-index:1;}
     .events-layout{max-width:1100px;margin:0 auto;padding:3rem 2rem 6rem;}
-    .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;}
+    .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;margin-bottom:2rem;}
     .event-banner{background:linear-gradient(135deg,rgba(155,89,255,0.2),rgba(0,212,255,0.1));border-bottom:1px solid var(--border);padding:2.5rem 2rem;position:relative;overflow:hidden;}
     .event-banner::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.06) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
     .event-label{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.4em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
@@ -76,6 +76,7 @@ export const prerender = true;
     .tier-price{font-family:var(--font-display);font-size:2rem;color:var(--cyan);letter-spacing:0.03em;text-align:right;min-width:80px;}
     .tier-add-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
     .tier-add-btn:hover{background:var(--teal);transform:translateY(-1px);}
+    .loading{text-align:center;padding:3rem;font-family:var(--font-ui);font-size:0.9rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);}
     footer{border-top:1px solid var(--border);padding:3rem 2rem;text-align:center;}
     .footer-logo{font-family:var(--font-display);font-size:2.5rem;letter-spacing:0.05em;margin-bottom:1rem;}
     .footer-links{display:flex;justify-content:center;gap:2rem;list-style:none;margin-bottom:2rem;flex-wrap:wrap;}
@@ -96,7 +97,7 @@ export const prerender = true;
     </ul>
     <div class="nav-right">
       <button class="cart-icon-btn" onclick="openCart()" aria-label="Open cart">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
           <circle cx="9" cy="21" r="1"></circle>
           <circle cx="20" cy="21" r="1"></circle>
           <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
@@ -113,21 +114,8 @@ export const prerender = true;
     <h1 class="page-title"><span class="holo-text">Upcoming</span><br><span style="color:var(--white)">Shows</span></h1>
   </header>
 
-  <div class="events-layout">
-    <div class="event-main">
-      <div class="event-banner">
-        <p class="event-label">Next Event</p>
-        <h2 class="event-name"><span class="holo-text">Vol. 1 — Press Play</span></h2>
-        <div class="event-details">
-          <div class="event-detail">Date: <span>TBA</span></div>
-          <div class="event-detail">Venue: <span>TBA</span></div>
-        </div>
-      </div>
-      <div class="event-body">
-        <p class="event-section-title">Select Your Section</p>
-        <div class="tier-list" id="tierList"></div>
-      </div>
-    </div>
+  <div class="events-layout" id="eventsLayout">
+    <div class="loading">Loading events...</div>
   </div>
 
   <footer>
@@ -142,7 +130,6 @@ export const prerender = true;
     <p class="footer-copy">© 2026 miXtape Wrestling. All rights reserved.</p>
   </footer>
 
-  <!-- Cart Drawer -->
   <div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
   <div class="cart-drawer" id="cartDrawer">
     <div class="cart-drawer-header">
@@ -173,51 +160,62 @@ export const prerender = true;
 
   <script src="/js/cart.js" is:inline></script>
   <script>
-    const TIERS = [
-      { id: 1, name: 'Ringside',          priceCents: 3500, stripePrice: 'price_1TfX1wAAiPqE8TkfHcv0trDs', capacity: 40 },
-      { id: 2, name: 'Row 2',             priceCents: 3500, stripePrice: 'price_1TfX2cAAiPqE8TkfYgWPoAo4', capacity: 40 },
-      { id: 3, name: 'Row 3',             priceCents: 3500, stripePrice: 'price_1TfX3LAAiPqE8TkfiW4dkQbY',  capacity: 40 },
-      { id: 4, name: 'General Admission', priceCents: 2750, stripePrice: 'price_1TfX46AAiPqE8Tkf3VJZ85zN', capacity: 150 },
-    ];
-
-    function getAvailLabel(capacity) {
-      if (capacity <= 0)  return { text: 'Sold Out!',    cls: 'sold-out' };
-      if (capacity <= 20) return { text: 'Almost Gone!', cls: 'almost-gone' };
-      return                     { text: 'In Stock',     cls: 'in-stock' };
+    function getAvailLabel(remaining, capacity) {
+      if (remaining <= 0) return { text: 'Sold Out!', cls: 'sold-out' };
+      if (remaining <= 20) return { text: 'Almost Gone!', cls: 'almost-gone' };
+      return { text: 'In Stock', cls: 'in-stock' };
     }
 
-    function buildTiers() {
-      var list = document.getElementById('tierList');
-      TIERS.forEach(function(t) {
-        var price = (t.priceCents / 100).toFixed(2);
-        var avail = getAvailLabel(t.capacity);
-        var soldOut = t.capacity <= 0;
-        var row = document.createElement('div');
-        row.className = 'tier-row' + (soldOut ? ' sold-out' : '');
-        row.innerHTML =
-          '<div class="tier-info">' +
-            '<div class="tier-name">' + t.name + '</div>' +
-            '<div class="tier-avail ' + avail.cls + '">' + avail.text + '</div>' +
-          '</div>' +
-          '<div class="tier-price">$' + price + '</div>' +
-          '<button class="tier-add-btn">' + (soldOut ? 'Sold Out' : 'Add to Cart') + '</button>';
-        if (!soldOut) {
-          row.querySelector('.tier-add-btn').addEventListener('click', function() {
-            addToCart({
-              name: t.name,
-              category: 'Vol. 1 — Press Play',
-              priceCents: t.priceCents,
-              stripePrice: t.stripePrice,
-              tierId: t.id,
-              qty: 1,
-            });
-          });
+    async function loadEvents() {
+      const layout = document.getElementById('eventsLayout');
+      try {
+        const res = await fetch('/api/events');
+        const events = await res.json();
+
+        if (!events || events.length === 0) {
+          layout.innerHTML = '<div class="loading">No upcoming events — check back soon!</div>';
+          return;
         }
-        list.appendChild(row);
-      });
+
+        layout.innerHTML = events.map(function(event, idx) {
+          const tiers = event.ticketTypes || [];
+          const tierHTML = tiers.map(function(t) {
+            const avail = getAvailLabel(t.remaining, t.capacity);
+            const soldOut = t.remaining <= 0;
+            const price = (t.price_cents / 100).toFixed(2);
+            return '<div class="tier-row' + (soldOut ? ' sold-out' : '') + '">' +
+              '<div class="tier-info">' +
+                '<div class="tier-name">' + t.name + '</div>' +
+                '<div class="tier-avail ' + avail.cls + '">' + avail.text + '</div>' +
+              '</div>' +
+              '<div class="tier-price">$' + price + '</div>' +
+              '<button class="tier-add-btn" ' + (soldOut ? 'disabled' : '') + ' onclick="addToCart({name:\'' + t.name + '\',category:\'' + event.name.replace(/'/g, "\\'") + '\',priceCents:' + t.price_cents + ',stripePrice:\'' + t.stripe_price_id + '\',tierId:' + t.id + ',qty:1})">' +
+              (soldOut ? 'Sold Out' : 'Add to Cart') + '</button>' +
+            '</div>';
+          }).join('');
+
+          return '<div class="event-main">' +
+            '<div class="event-banner">' +
+              '<p class="event-label">' + (idx === 0 ? 'Next Event' : 'Upcoming') + '</p>' +
+              '<h2 class="event-name"><span class="holo-text">' + event.name + '</span></h2>' +
+              '<div class="event-details">' +
+                '<div class="event-detail">Date: <span>' + (event.date || 'TBA') + '</span></div>' +
+                '<div class="event-detail">Venue: <span>' + (event.venue || 'TBA') + '</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="event-body">' +
+              '<p class="event-section-title">Select Your Section</p>' +
+              '<div class="tier-list">' + tierHTML + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+      } catch(err) {
+        layout.innerHTML = '<div class="loading">Unable to load events — please refresh.</div>';
+      }
     }
 
-    buildTiers();
+    loadEvents();
   </script>
 </body>
 </html>
