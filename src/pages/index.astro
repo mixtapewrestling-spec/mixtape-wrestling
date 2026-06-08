@@ -50,6 +50,21 @@ export const prerender = true;
     .nav-right{display:flex;align-items:center;gap:1rem;}
     .nav-cta{font-family:var(--font-ui);font-size:0.85rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);padding:0.5rem 1.25rem;text-decoration:none;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;}
     .nav-cta:hover{background:var(--teal);transform:translateY(-1px);}
+    .announcement-bar {
+      background: linear-gradient(135deg, rgba(155,89,255,0.3), rgba(0,212,255,0.2));
+      border-bottom: 1px solid var(--border);
+      padding: 0.6rem 2rem;
+      text-align: center;
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--white);
+      display: none;
+      margin-top: 64px;
+    }
+    .announcement-bar.visible { display: block; }
     .hero {
       min-height:100vh;display:flex;flex-direction:column;
       align-items:center;justify-content:center;text-align:center;
@@ -152,6 +167,7 @@ export const prerender = true;
       <li><a href="/about">About</a></li>
     </ul>
     <div class="nav-right">
+      <div id="navSocials" style="display:flex;gap:0.75rem;align-items:center;"></div>
       <button class="cart-icon-btn" onclick="openCart()" aria-label="Open cart">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="24" height="24">
           <circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle>
@@ -159,7 +175,6 @@ export const prerender = true;
         </svg>
         <span class="cart-count">0</span>
       </button>
-      <div id="navSocials" style="display:flex;gap:0.75rem;align-items:center;"></div>
       <a href="/events" class="nav-cta">Get Tickets</a>
     </div>
   </nav>
