@@ -115,8 +115,9 @@ export async function onRequestPost(context) {
       const image_url = body.get('image_url') || '';
       const category = body.get('category') || 'merch';
       const featured_a = body.get('featured') === '1' ? 1 : 0;
-      await db.prepare("INSERT INTO products (name,description,price_cents,stripe_price_id,image_url,category,in_stock,featured) VALUES (?,?,?,?,?,?,1,?)")
-        .bind(name, description, price, stripe_price_id, image_url, category, featured_a).run();
+      const stock_qty_a = parseInt(body.get('stock_quantity') || '-1');
+      await db.prepare("INSERT INTO products (name,description,price_cents,stripe_price_id,image_url,category,in_stock,featured,stock_quantity) VALUES (?,?,?,?,?,?,1,?,?)")
+        .bind(name, description, price, stripe_price_id, image_url, category, featured_a, stock_qty_a).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=store' } });
     }
 
@@ -129,8 +130,9 @@ export async function onRequestPost(context) {
       const image_url = body.get('image_url') || '';
       const in_stock = body.get('in_stock') === '1' ? 1 : 0;
       const featured_u = body.get('featured') === '1' ? 1 : 0;
-      await db.prepare("UPDATE products SET name=?,description=?,price_cents=?,stripe_price_id=?,image_url=?,in_stock=?,featured=? WHERE id=?")
-        .bind(name, description, price, stripe_price_id, image_url, in_stock, featured_u, id).run();
+      const stock_qty_u = parseInt(body.get('stock_quantity') || '-1');
+      await db.prepare("UPDATE products SET name=?,description=?,price_cents=?,stripe_price_id=?,image_url=?,in_stock=?,featured=?,stock_quantity=? WHERE id=?")
+        .bind(name, description, price, stripe_price_id, image_url, in_stock, featured_u, stock_qty_u, id).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=store' } });
     }
 
@@ -618,6 +620,9 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
               <option value="0">No</option>
               <option value="1">Yes — show on homepage</option>
             </select>
+          </div>
+          <div class="form-group"><label>Stock Quantity (-1 = unlimited)</label>
+            <input type="number" name="stock_quantity" id="productStock_qty" value="-1" min="-1" />
           </div>
         </div>
         <button type="submit" class="save-btn">Save Product</button>
