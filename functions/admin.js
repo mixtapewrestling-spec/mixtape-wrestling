@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
     const section = url.searchParams.get('s') || 'dashboard';
     const eventId = url.searchParams.get('event') || '';
 
-    const eventsRes = await db.prepare("SELECT * FROM events ORDER BY CASE WHEN date IS NULL OR date = "" OR date = "TBA" THEN 1 ELSE 0 END, date ASC, id DESC").all();
+    const eventsRes = await db.prepare("SELECT * FROM events ORDER BY CASE WHEN date IS NULL OR date = '' OR date = 'TBA' THEN 1 ELSE 0 END, date ASC, id DESC").all();
     const events = eventsRes.results ?? [];
     const currentEvent = events.find(e => e.id == eventId) || events[0];
     const eid = currentEvent?.id || 1;
