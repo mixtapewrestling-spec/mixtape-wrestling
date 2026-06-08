@@ -360,6 +360,15 @@ export const prerender = true;
         if (settings.tiktok) socials.push('<a href="' + settings.tiktok + '" target="_blank" style="font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);text-decoration:none">TikTok</a>');
         if (socials.length > 0) document.getElementById('footerSocial').innerHTML = socials.join('');
 
+        // Announcement banner
+        if (settings.announcement_text && (settings.announcement_active === '1' || settings.announcement_active === 1)) {
+          var bar = document.getElementById('announcementBar');
+          if (bar) {
+            bar.textContent = settings.announcement_text;
+            bar.classList.add('visible');
+          }
+        }
+
         // Products — load from DB if available
         // (placeholder cards stay until real products are added)
 
