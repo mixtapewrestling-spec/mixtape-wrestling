@@ -53,8 +53,9 @@ export const prerender = true;
     .page-header-glow{position:absolute;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(155,89,255,0.12) 0%,rgba(0,212,255,0.06) 40%,transparent 70%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
     .page-eyebrow{font-family:var(--font-ui);font-size:0.8rem;font-weight:700;letter-spacing:0.35em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
     .page-title{font-family:var(--font-display);font-size:clamp(3rem,10vw,7rem);line-height:0.9;letter-spacing:0.02em;position:relative;z-index:1;}
-    .events-layout{max-width:1100px;margin:0 auto;padding:3rem 2rem 6rem;}
-    .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;margin-bottom:2rem;}
+    .events-layout{max-width:1200px;margin:0 auto;padding:3rem 2rem 6rem;}
+    .event-block{display:grid;grid-template-columns:1fr 340px;gap:2rem;margin-bottom:3rem;align-items:start;}
+    .event-main{background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 24px) 0,100% 24px,100% 100%,0 100%);overflow:hidden;}
     .event-banner{background:linear-gradient(135deg,rgba(155,89,255,0.2),rgba(0,212,255,0.1));border-bottom:1px solid var(--border);padding:2.5rem 2rem;position:relative;overflow:hidden;}
     .event-banner::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.06) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.06) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
     .event-label{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.4em;text-transform:uppercase;color:var(--cyan);margin-bottom:0.75rem;position:relative;z-index:1;}
@@ -66,6 +67,7 @@ export const prerender = true;
     .event-section-title{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.4em;text-transform:uppercase;color:var(--muted);margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
     .tier-list{display:flex;flex-direction:column;gap:0.75rem;}
     .tier-row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--charcoal);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px));transition:border-color 0.2s;}
+    .tier-row:hover{border-color:rgba(0,212,255,0.3);}
     .tier-row.sold-out{opacity:0.5;pointer-events:none;}
     .tier-info{display:flex;flex-direction:column;gap:0.25rem;}
     .tier-name{font-family:var(--font-display);font-size:1.5rem;letter-spacing:0.05em;}
@@ -76,6 +78,18 @@ export const prerender = true;
     .tier-price{font-family:var(--font-display);font-size:2rem;color:var(--cyan);letter-spacing:0.03em;text-align:right;min-width:80px;}
     .tier-add-btn{font-family:var(--font-ui);font-size:0.75rem;font-weight:700;letter-spacing:0.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:0.55rem 1.1rem;clip-path:polygon(6px 0%,100% 0%,calc(100% - 6px) 100%,0% 100%);transition:background 0.2s,transform 0.2s;white-space:nowrap;}
     .tier-add-btn:hover{background:var(--teal);transform:translateY(-1px);}
+
+    /* POSTER */
+    .event-poster{position:sticky;top:84px;}
+    .poster-img{width:100%;aspect-ratio:2/3;background:var(--surface);border:1px solid var(--border);clip-path:polygon(0 0,calc(100% - 20px) 0,100% 20px,100% 100%,20px 100%,0 calc(100% - 20px));overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center;}
+    .poster-img img{width:100%;height:100%;object-fit:cover;display:block;}
+    .poster-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;padding:2rem;text-align:center;}
+    .poster-placeholder::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(155,89,255,0.15),rgba(0,212,255,0.08));}
+    .poster-placeholder-title{font-family:var(--font-display);font-size:2.5rem;letter-spacing:0.05em;position:relative;z-index:1;line-height:1;}
+    .poster-placeholder-sub{font-family:var(--font-ui);font-size:0.7rem;font-weight:700;letter-spacing:0.3em;text-transform:uppercase;color:var(--muted);position:relative;z-index:1;}
+    .poster-scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:scan 4s linear infinite;opacity:0.3;z-index:2;}
+    @keyframes scan{0%{top:0%}100%{top:100%}}
+
     .loading{text-align:center;padding:3rem;font-family:var(--font-ui);font-size:0.9rem;font-weight:600;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);}
     footer{border-top:1px solid var(--border);padding:3rem 2rem;text-align:center;}
     .footer-logo{font-family:var(--font-display);font-size:2.5rem;letter-spacing:0.05em;margin-bottom:1rem;}
@@ -83,6 +97,7 @@ export const prerender = true;
     .footer-links a{font-family:var(--font-ui);font-size:0.8rem;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
     .footer-links a:hover{color:var(--cyan);}
     .footer-copy{font-family:var(--font-ui);font-size:0.75rem;letter-spacing:0.1em;color:var(--border);text-transform:uppercase;}
+    @media(max-width:900px){.event-block{grid-template-columns:1fr}.event-poster{position:static;order:-1}}
     @media(max-width:768px){nav{padding:0 1.25rem}.nav-links{display:none}.tier-row{grid-template-columns:1fr auto;gap:0.75rem}.tier-price{display:none}}
   </style>
 </head>
@@ -160,17 +175,17 @@ export const prerender = true;
 
   <script src="/js/cart.js" is:inline></script>
   <script>
-    function getAvailLabel(remaining, capacity) {
+    function getAvailLabel(remaining) {
       if (remaining <= 0) return { text: 'Sold Out!', cls: 'sold-out' };
       if (remaining <= 20) return { text: 'Almost Gone!', cls: 'almost-gone' };
       return { text: 'In Stock', cls: 'in-stock' };
     }
 
     async function loadEvents() {
-      const layout = document.getElementById('eventsLayout');
+      var layout = document.getElementById('eventsLayout');
       try {
-        const res = await fetch('/api/events');
-        const events = await res.json();
+        var res = await fetch('/api/events');
+        var events = await res.json();
 
         if (!events || events.length === 0) {
           layout.innerHTML = '<div class="loading">No upcoming events — check back soon!</div>';
@@ -178,34 +193,52 @@ export const prerender = true;
         }
 
         layout.innerHTML = events.map(function(event, idx) {
-          const tiers = event.ticketTypes || [];
-          const tierHTML = tiers.map(function(t) {
-            const avail = getAvailLabel(t.remaining, t.capacity);
-            const soldOut = t.remaining <= 0;
-            const price = (t.price_cents / 100).toFixed(2);
+          var tiers = event.ticketTypes || [];
+
+          var tierHTML = tiers.map(function(t) {
+            var avail = getAvailLabel(t.remaining);
+            var soldOut = t.remaining <= 0;
+            var price = (t.price_cents / 100).toFixed(2);
+            var safeName = t.name.replace(/'/g, "\\'");
+            var safeEvent = event.name.replace(/'/g, "\\'");
             return '<div class="tier-row' + (soldOut ? ' sold-out' : '') + '">' +
               '<div class="tier-info">' +
                 '<div class="tier-name">' + t.name + '</div>' +
                 '<div class="tier-avail ' + avail.cls + '">' + avail.text + '</div>' +
               '</div>' +
               '<div class="tier-price">$' + price + '</div>' +
-              '<button class="tier-add-btn" ' + (soldOut ? 'disabled' : '') + ' onclick="addToCart({name:\'' + t.name + '\',category:\'' + event.name.replace(/'/g, "\\'") + '\',priceCents:' + t.price_cents + ',stripePrice:\'' + t.stripe_price_id + '\',tierId:' + t.id + ',qty:1})">' +
-              (soldOut ? 'Sold Out' : 'Add to Cart') + '</button>' +
+              '<button class="tier-add-btn"' + (soldOut ? ' disabled' : '') + ' onclick=\'addToCart({name:"' + safeName + '",category:"' + safeEvent + '",priceCents:' + t.price_cents + ',stripePrice:"' + t.stripe_price_id + '",tierId:' + t.id + ',qty:1})\'>' +
+              (soldOut ? 'Sold Out' : 'Add to Cart') +
+              '</button>' +
             '</div>';
           }).join('');
 
-          return '<div class="event-main">' +
-            '<div class="event-banner">' +
-              '<p class="event-label">' + (idx === 0 ? 'Next Event' : 'Upcoming') + '</p>' +
-              '<h2 class="event-name"><span class="holo-text">' + event.name + '</span></h2>' +
-              '<div class="event-details">' +
-                '<div class="event-detail">Date: <span>' + (event.date || 'TBA') + '</span></div>' +
-                '<div class="event-detail">Venue: <span>' + (event.venue || 'TBA') + '</span></div>' +
+          var posterHTML = event.poster_url
+            ? '<img src="' + event.poster_url + '" alt="' + event.name + ' poster" />'
+            : '<div class="poster-placeholder">' +
+                '<div class="poster-scan-line"></div>' +
+                '<div class="poster-placeholder-title"><span style="background:linear-gradient(135deg,#00d4ff,#9b59ff,#ff6ec7,#00f5d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">miX</span>tape</div>' +
+                '<div class="poster-placeholder-title" style="font-size:1.5rem;color:#8888aa">' + event.name + '</div>' +
+                '<div class="poster-placeholder-sub">Poster Coming Soon</div>' +
+              '</div>';
+
+          return '<div class="event-block">' +
+            '<div class="event-main">' +
+              '<div class="event-banner">' +
+                '<p class="event-label">' + (idx === 0 ? 'Next Event' : 'Upcoming') + '</p>' +
+                '<h2 class="event-name"><span style="background:linear-gradient(135deg,#00d4ff,#9b59ff,#ff6ec7,#00f5d4,#00d4ff);background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:holo-shift 4s ease infinite">' + event.name + '</span></h2>' +
+                '<div class="event-details">' +
+                  '<div class="event-detail">Date: <span>' + (event.date || 'TBA') + '</span></div>' +
+                  '<div class="event-detail">Venue: <span>' + (event.venue || 'TBA') + '</span></div>' +
+                '</div>' +
+              '</div>' +
+              '<div class="event-body">' +
+                '<p class="event-section-title">Select Your Section</p>' +
+                '<div class="tier-list">' + tierHTML + '</div>' +
               '</div>' +
             '</div>' +
-            '<div class="event-body">' +
-              '<p class="event-section-title">Select Your Section</p>' +
-              '<div class="tier-list">' + tierHTML + '</div>' +
+            '<div class="event-poster">' +
+              '<div class="poster-img">' + posterHTML + '</div>' +
             '</div>' +
           '</div>';
         }).join('');
