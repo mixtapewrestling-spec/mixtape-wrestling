@@ -1,41 +1,42 @@
 export async function onRequestPost(context) {
-  const env = context.env;
-  const STRIPE_SECRET_KEY = env?.STRIPE_SECRET_KEY ?? '';
-  const SITE_URL = env?.SITE_URL ?? 'https://mixtapewrestling.com';
+  const STRIPE_SECRET_KEY = context.env.STRIPE_SECRET_KEY ?? '';
+  const SITE_URL = context.env.SITE_URL ?? 'https://www.mixtapewrestling.com';
 
   if (!STRIPE_SECRET_KEY) {
-    return new Response(JSON.stringify({ error: 'Stripe not configured' }), {
+    return new Response(JSON.stringify({ error: 'No Stripe key' }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
 
   let body;
-  let rawText = '';
-  try { 
-    rawText = await context.request.text();
-    body = JSON.parse(rawText);
-  }
-  catch(e) {
-    return new Response(JSON.stringify({ error: 'Invalid request', raw: rawText, message: e.message }), {
+  try {
+    body = await context.request.json();
+  } catch(e) {
+    return new Response(JSON.stringify({ error: 'JSON parse failed', detail: e.message }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  const { cart, customerName, customerEmail } = body;
+  const cart = body.cart;
+  const customerName = body.customerName || '';
+  const customerEmail = body.customerEmail || '';
 
-  console.log('Checkout request:', JSON.stringify({ cart, customerName, customerEmail }));
-  if (!cart || cart.length === 0 || !customerEmail) {
-    return new Response(JSON.stringify({ error: 'Missing required fields', debug: { cart, customerName, customerEmail } }), {
+  if (!cart || !Array.isArray(cart) || cart.length === 0 || !customerEmail) {
+    return new Response(JSON.stringify({ 
+      error: 'Missing fields',
+      hasCart: !!cart,
+      cartLength: cart ? cart.length : 0,
+      hasEmail: !!customerEmail
+    }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  const lineItems = cart.map(function(item, i) {
-    return [
-      ['line_items[' + i + '][price]', item.stripePrice],
-      ['line_items[' + i + '][quantity]', String(item.qty)],
-    ];
-  }).flat();
+  const lineItems = [];
+  cart.forEach(function(item, i) {
+    lineItems.push(['line_items[' + i + '][price]', item.stripePrice]);
+    lineItems.push(['line_items[' + i + '][quantity]', String(item.qty)]);
+  });
 
   const cartMeta = JSON.stringify(cart.map(function(i) {
     return { name: i.name, qty: i.qty, tierId: i.tierId || '' };
@@ -65,7 +66,7 @@ export async function onRequestPost(context) {
   const session = await stripeRes.json();
 
   if (!stripeRes.ok) {
-    return new Response(JSON.stringify({ error: session.error?.message ?? 'Stripe error' }), {
+    return new Response(JSON.stringify({ error: session.error?.message ?? 'Stripe error', stripeStatus: stripeRes.status }), {
       status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
@@ -74,4 +75,3 @@ export async function onRequestPost(context) {
     status: 200, headers: { 'Content-Type': 'application/json' },
   });
 }
-// debug refresh
