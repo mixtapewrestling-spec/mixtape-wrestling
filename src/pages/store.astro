@@ -40,6 +40,7 @@ export const prerender = true;
       background:rgba(10,10,12,0.88);backdrop-filter:blur(12px);
       border-bottom:1px solid var(--border);
     }
+    .nav-links-wrap{position:absolute;left:50%;transform:translateX(-50%);}
     .nav-logo{font-family:var(--font-display);font-size:1.6rem;letter-spacing:0.05em;text-decoration:none;line-height:1;}
     .nav-links{display:flex;gap:2rem;list-style:none;}
     .nav-links a{font-family:var(--font-ui);font-size:0.95rem;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color 0.2s;}
@@ -86,12 +87,12 @@ export const prerender = true;
 <body>
   <nav>
     <a href="/" class="nav-logo"><span class="holo-text">miX</span><span style="color:var(--white)">tape</span></a>
-    <ul class="nav-links">
+    <div class="nav-links-wrap"><ul class="nav-links">
       <li><a href="/events">Events</a></li>
       <li><a href="/store" class="active">Store</a></li>
       <li><a href="/roster">Roster</a></li>
       <li><a href="/about">About</a></li>
-    </ul>
+    </ul></div>
     <div class="nav-right">
       <div id="navSocials" style="display:flex;gap:0.75rem;align-items:center;"></div>
       <button class="cart-icon-btn" onclick="openCart()" aria-label="Open cart">

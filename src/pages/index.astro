@@ -43,6 +43,7 @@ export const prerender = true;
       background:rgba(10,10,12,0.88);backdrop-filter:blur(12px);
       border-bottom:1px solid var(--border);
     }
+    .nav-links-wrap{position:absolute;left:50%;transform:translateX(-50%);}
     .nav-links-wrap {
       position:absolute;left:50%;transform:translateX(-50%);
     }
@@ -163,12 +164,12 @@ export const prerender = true;
 
   <nav>
     <a href="/" class="nav-logo"><span class="holo-text">miX</span><span style="color:var(--white)">tape</span></a>
-    <ul class="nav-links">
+    <div class="nav-links-wrap"><ul class="nav-links">
       <li><a href="/events">Events</a></li>
       <li><a href="/store">Store</a></li>
       <li><a href="/roster">Roster</a></li>
       <li><a href="/about">About</a></li>
-    </ul>
+    </ul></div>
     <div class="nav-right">
       <div id="navSocials" style="display:flex;gap:0.75rem;align-items:center;"></div>
       <button class="cart-icon-btn" onclick="openCart()" aria-label="Open cart">
