@@ -19,8 +19,9 @@ export async function onRequestPost(context) {
 
   const { cart, customerName, customerEmail } = body;
 
+  console.log('Checkout request:', JSON.stringify({ cart, customerName, customerEmail }));
   if (!cart || cart.length === 0 || !customerEmail) {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+    return new Response(JSON.stringify({ error: 'Missing required fields', debug: { cart, customerName, customerEmail } }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
