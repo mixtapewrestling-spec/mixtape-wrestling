@@ -91,7 +91,7 @@
     btn.disabled = true;
     btn.textContent = 'Redirecting...';
     try {
-      var res = await fetch('/api/create-checkout', {
+      var res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cart: cart, customerName: name, customerEmail: email }),
