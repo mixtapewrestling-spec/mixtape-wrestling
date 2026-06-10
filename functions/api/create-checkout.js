@@ -10,9 +10,13 @@ export async function onRequestPost(context) {
   }
 
   let body;
-  try { body = await context.request.json(); }
-  catch {
-    return new Response(JSON.stringify({ error: 'Invalid request' }), {
+  let rawText = '';
+  try { 
+    rawText = await context.request.text();
+    body = JSON.parse(rawText);
+  }
+  catch(e) {
+    return new Response(JSON.stringify({ error: 'Invalid request', raw: rawText, message: e.message }), {
       status: 400, headers: { 'Content-Type': 'application/json' },
     });
   }
