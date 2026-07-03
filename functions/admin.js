@@ -11,6 +11,7 @@ export async function onRequestGet(context) {
     const url = new URL(context.request.url);
     const section = url.searchParams.get('s') || 'dashboard';
     const eventId = url.searchParams.get('event') || '';
+    const plId = url.searchParams.get('pl') || '';
 
     const eventsRes = await db.prepare("SELECT * FROM events ORDER BY CASE WHEN date IS NULL OR date = '' OR date = 'TBA' THEN 1 ELSE 0 END, date ASC, id DESC").all();
     const events = eventsRes.results ?? [];
@@ -25,12 +26,17 @@ export async function onRequestGet(context) {
     const settingsMap = {};
     settings.forEach(s => { settingsMap[s.key] = s.value; });
 
-    // Revenue data
     const allTickets = (await db.prepare("SELECT t.*, tt.price_cents, e.name as event_name FROM tickets t JOIN ticket_types tt ON t.ticket_type_id = tt.id JOIN events e ON t.event_id = e.id").all()).results ?? [];
     const ticketRevenue = allTickets.reduce((sum, t) => sum + (t.price_cents || 0), 0);
-    const productRevenue = 0; // Will come from Stripe later
+    const productRevenue = 0;
 
-    return new Response(adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settingsMap, ticketRevenue, productRevenue, allTickets), {
+    const allPL = (await db.prepare("SELECT * FROM show_pl ORDER BY created_at DESC").all()).results ?? [];
+    let currentPL = null;
+    if (plId) {
+      currentPL = allPL.find(p => p.id == plId) || null;
+    }
+
+    return new Response(adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settingsMap, ticketRevenue, productRevenue, allTickets, allPL, currentPL), {
       headers: { 'Content-Type': 'text/html' }
     });
 
@@ -82,7 +88,6 @@ export async function onRequestPost(context) {
       const venue = body.get('venue') || 'TBA';
       const result = await db.prepare("INSERT INTO events (name, date, venue, active) VALUES (?, ?, ?, 0)").bind(name, date, venue).run();
       const newId = result.meta?.last_row_id || 1;
-      // Add default ticket tiers
       await db.prepare("INSERT INTO ticket_types (event_id, name, price_cents, capacity) VALUES (?,?,?,?),(?,?,?,?),(?,?,?,?),(?,?,?,?)")
         .bind(newId,'Ringside',3500,40, newId,'Row 2',3500,40, newId,'Row 3',3500,40, newId,'General Admission',2750,150).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + newId } });
@@ -151,13 +156,39 @@ export async function onRequestPost(context) {
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=settings' } });
     }
 
+    if (action === 'save-pl') {
+      const id = body.get('id') || '';
+      const show_name = body.get('show_name') || '';
+      const show_date = body.get('show_date') || '';
+      const data_json = body.get('data_json') || '{}';
+      const net_profit = parseInt(body.get('net_profit') || '0');
+      const total_revenue = parseInt(body.get('total_revenue') || '0');
+      const total_expenses = parseInt(body.get('total_expenses') || '0');
+      const attendance = parseInt(body.get('attendance') || '0');
+
+      if (id) {
+        await db.prepare("UPDATE show_pl SET show_name=?,show_date=?,data_json=?,net_profit=?,total_revenue=?,total_expenses=?,attendance=? WHERE id=?")
+          .bind(show_name, show_date, data_json, net_profit, total_revenue, total_expenses, attendance, id).run();
+        return new Response('', { status: 302, headers: { 'Location': '/admin?s=pl&pl=' + id } });
+      } else {
+        const result = await db.prepare("INSERT INTO show_pl (show_name,show_date,data_json,net_profit,total_revenue,total_expenses,attendance) VALUES (?,?,?,?,?,?,?)")
+          .bind(show_name, show_date, data_json, net_profit, total_revenue, total_expenses, attendance).run();
+        const newId = result.meta?.last_row_id || '';
+        return new Response('', { status: 302, headers: { 'Location': '/admin?s=pl&pl=' + newId } });
+      }
+    }
+
+    if (action === 'delete-pl') {
+      const id = body.get('id');
+      await db.prepare("DELETE FROM show_pl WHERE id=?").bind(id).run();
+      return new Response('', { status: 302, headers: { 'Location': '/admin?s=pl' } });
+    }
+
     return new Response('Unknown action', { status: 400 });
   } catch(err) {
     return new Response('Error: ' + err.message, { status: 500 });
   }
-}
-
-function loginPage(error) {
+}function loginPage(error) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -196,7 +227,99 @@ function loginPage(error) {
 </html>`;
 }
 
-function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settings, ticketRevenue, productRevenue, allTickets) {
+function plEditorHTML(pl) {
+  const d = pl ? JSON.parse(pl.data_json || '{}') : {};
+  const v = (key, def) => d[key] !== undefined ? d[key] : def;
+  return `
+  <form method="POST" action="/admin?action=save-pl" id="plForm">
+    <input type="hidden" name="id" value="${pl ? pl.id : ''}" />
+    <input type="hidden" name="data_json" id="plDataJson" value="" />
+    <input type="hidden" name="net_profit" id="plNetProfit" value="0" />
+    <input type="hidden" name="total_revenue" id="plTotalRevenue" value="0" />
+    <input type="hidden" name="total_expenses" id="plTotalExpenses" value="0" />
+    <input type="hidden" name="attendance" id="plAttendance" value="0" />
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="form-group">
+        <label>Show Name</label>
+        <input type="text" name="show_name" value="${pl ? pl.show_name : ''}" placeholder="Vol. 1" required />
+      </div>
+      <div class="form-group">
+        <label>Show Date</label>
+        <input type="text" name="show_date" value="${pl ? pl.show_date : ''}" placeholder="e.g. Sat Sep 20, 2026" />
+      </div>
+    </div>
+
+    <div class="pl-summary-grid">
+      <div class="pl-card pl-card-blue"><div class="pl-card-label">Total Revenue</div><div class="pl-card-val" id="s-revenue">$0</div></div>
+      <div class="pl-card pl-card-amber"><div class="pl-card-label">Total Expenses</div><div class="pl-card-val" id="s-expenses">$0</div></div>
+      <div class="pl-card pl-card-green"><div class="pl-card-label">Net Profit / Loss</div><div class="pl-card-val" id="s-net">$0</div></div>
+      <div class="pl-card pl-card-blue"><div class="pl-card-label">Attendance</div><div class="pl-card-val" id="s-attendance">0</div></div>
+    </div>
+
+    <div class="pl-toggle-row">
+      <label class="pl-toggle"><input type="checkbox" id="alcoholToggle" onchange="plCalc()" ${v('alcohol_on', false) ? 'checked' : ''} /><span class="pl-slider"></span></label>
+      <span style="font-family:var(--font-ui);font-size:.85rem;color:var(--muted)">Include alcohol revenue & costs</span>
+    </div>
+
+    <div class="pl-section">
+      <div class="pl-section-title">🎟 Ticket Revenue</div>
+      <div class="pl-row-head"><span>Tier</span><span>Qty</span><span>Price</span><span>Revenue</span></div>
+      <div class="pl-row"><label>Balcony / Cassette</label><input type="number" id="t1q" value="${v('t1q',22)}" onchange="plCalc()" /><input type="number" id="t1p" value="${v('t1p',40)}" onchange="plCalc()" /><div class="pl-computed" id="t1r">$0</div></div>
+      <div class="pl-row"><label>Floor VIP (seated)</label><input type="number" id="t2q" value="${v('t2q',76)}" onchange="plCalc()" /><input type="number" id="t2p" value="${v('t2p',35)}" onchange="plCalc()" /><div class="pl-computed" id="t2r">$0</div></div>
+      <div class="pl-row"><label>GA Seated</label><input type="number" id="t3q" value="${v('t3q',62)}" onchange="plCalc()" /><input type="number" id="t3p" value="${v('t3p',30)}" onchange="plCalc()" /><div class="pl-computed" id="t3r">$0</div></div>
+      <div class="pl-row"><label>GA Standing</label><input type="number" id="t4q" value="${v('t4q',40)}" onchange="plCalc()" /><input type="number" id="t4p" value="${v('t4p',27.50)}" onchange="plCalc()" /><div class="pl-computed" id="t4r">$0</div></div>
+      <div class="pl-total-row"><span>Ticket Total</span><div class="pl-total" id="ticket-total">$0</div></div>
+    </div>
+
+    <div class="pl-section">
+      <div class="pl-section-title">👕 Merch</div>
+      <div class="pl-row-head"><span>Item</span><span>Qty</span><span>Sell / Cost</span><span>Profit</span></div>
+      <div class="pl-row"><label>T-Shirts</label><input type="number" id="shq" value="${v('shq',30)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="shs" value="${v('shs',30)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="shc" value="${v('shc',10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="sh-profit">$0</div></div>
+      <div class="pl-row"><label>Event Cassette</label><input type="number" id="ceq" value="${v('ceq',20)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="ces" value="${v('ces',8)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="cec" value="${v('cec',2)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="ce-profit">$0</div></div>
+      <div class="pl-row"><label>Regular Cassette</label><input type="number" id="crq" value="${v('crq',20)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="crs" value="${v('crs',5)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="crc" value="${v('crc',1.10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="cr-profit">$0</div></div>
+      <div class="pl-row"><label>Bundled Cassette Cost</label><input type="number" id="cbq" value="${v('cbq',22)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="cbc" value="${v('cbc',1.10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed pl-neg" id="cb-cost">$0</div></div>
+      <div class="pl-total-row"><span>Merch Total</span><div class="pl-total" id="merch-total">$0</div></div>
+    </div>
+
+    <div class="pl-section" id="alcoholSection" style="display:none">
+      <div class="pl-section-title">🍺 Alcohol</div>
+      <div class="pl-row-head"><span>Item</span><span>Units</span><span>Sell / Cost</span><span>Profit</span></div>
+      <div class="pl-row"><label>Beer Sold</label><input type="number" id="bq" value="${v('bq',150)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="bs" value="${v('bs',8)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="bc" value="${v('bc',1.83)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="b-profit">$0</div></div>
+      <div class="pl-row"><label>SOP Permit</label><input type="number" id="sopq" value="1" style="visibility:hidden" /><div style="display:flex;gap:4px"><input type="number" id="sopc" value="${v('sopc',100)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed pl-neg" id="sop-cost">$0</div></div>
+      <div class="pl-total-row"><span>Alcohol Net</span><div class="pl-total" id="alcohol-total">$0</div></div>
+    </div>
+
+    <div class="pl-section">
+      <div class="pl-section-title">📋 Expenses</div>
+      <div class="pl-exp-grid">
+        <div class="form-group"><label>Venue</label><input type="number" id="ex-venue" value="${v('ex_venue',2400)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Talent</label><input type="number" id="ex-talent" value="${v('ex_talent',1500)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Truck Rental</label><input type="number" id="ex-truck" value="${v('ex_truck',200)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Production</label><input type="number" id="ex-prod" value="${v('ex_prod',700)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Staff</label><input type="number" id="ex-staff" value="${v('ex_staff',500)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Graphics</label><input type="number" id="ex-graphics" value="${v('ex_graphics',200)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Ring Rental</label><input type="number" id="ex-ring" value="${v('ex_ring',0)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Chair Rental</label><input type="number" id="ex-chairs" value="${v('ex_chairs',0)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Lighting</label><input type="number" id="ex-lighting" value="${v('ex_lighting',0)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Audio</label><input type="number" id="ex-audio" value="${v('ex_audio',0)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Pipe & Drape</label><input type="number" id="ex-drape" value="${v('ex_drape',0)}" onchange="plCalc()" /></div>
+        <div class="form-group"><label>Other</label><input type="number" id="ex-other" value="${v('ex_other',0)}" onchange="plCalc()" /></div>
+      </div>
+      <div class="pl-total-row"><span>Total Expenses</span><div class="pl-total pl-neg" id="exp-total">$0</div></div>
+    </div>
+
+    <div style="border-top:2px solid var(--cyan);margin-top:1rem;padding-top:1rem;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-family:var(--font-display);font-size:2rem;letter-spacing:.05em">NET PROFIT / LOSS</span>
+      <div class="pl-total" id="net-total" style="font-size:1.5rem">$0</div>
+    </div>
+
+    <div style="margin-top:1.5rem;display:flex;gap:1rem;align-items:center">
+      <button type="submit" class="save-btn" onclick="prepPLSubmit()">💾 Save P&L</button>
+      ${pl ? `<form method="POST" action="/admin?action=delete-pl" style="display:inline" onsubmit="return confirm('Delete this P&L?')"><input type="hidden" name="id" value="${pl.id}" /><button type="submit" class="danger-btn">Delete</button></form>` : ''}
+    </div>
+  </form>`;
+}function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settings, ticketRevenue, productRevenue, allTickets, allPL, currentPL) {
   const eid = currentEvent?.id || '';
   const eventOptions = events.map(e => `<option value="${e.id}" ${e.id==eid?'selected':''}>${e.name}</option>`).join('');
   const totalRevenue = ticketRevenue + productRevenue;
@@ -207,6 +330,11 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
     if (!revenueByEvent[t.event_name]) revenueByEvent[t.event_name] = 0;
     revenueByEvent[t.event_name] += t.price_cents || 0;
   });
+
+  const plYearRevenue = allPL.reduce((s,p) => s + (p.total_revenue||0), 0);
+  const plYearExpenses = allPL.reduce((s,p) => s + (p.total_expenses||0), 0);
+  const plYearNet = allPL.reduce((s,p) => s + (p.net_profit||0), 0);
+  const plYearAttendance = allPL.reduce((s,p) => s + (p.attendance||0), 0);
 
   const salesCards = salesByTier.map(t => {
     const sold = t.sold||0;
@@ -273,6 +401,20 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
     `<tr><td>${name}</td><td>$${(rev/100).toFixed(2)}</td></tr>`
   ).join('');
 
+  const plHistoryRows = allPL.map(p => {
+    const net = p.net_profit || 0;
+    const netFmt = (net >= 0 ? '+$' : '-$') + Math.abs(net/100).toFixed(0);
+    const netColor = net >= 0 ? 'var(--teal)' : '#ff6b6b';
+    return `<tr>
+      <td><a href="/admin?s=pl&pl=${p.id}" style="color:var(--cyan);text-decoration:none;font-weight:600">${p.show_name}</a></td>
+      <td style="color:var(--muted)">${p.show_date||'—'}</td>
+      <td>$${((p.total_revenue||0)/100).toFixed(0)}</td>
+      <td>$${((p.total_expenses||0)/100).toFixed(0)}</td>
+      <td style="color:${netColor};font-weight:700">${netFmt}</td>
+      <td>${p.attendance||0}</td>
+    </tr>`;
+  }).join('');
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -310,7 +452,6 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
     .section-title{font-family:var(--font-display);font-size:1.5rem;letter-spacing:.05em;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
     .card{background:var(--surface);border:1px solid var(--border);padding:1.5rem;margin-bottom:1.5rem}
     .form-row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
-    .form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem}
     .form-group{display:flex;flex-direction:column;gap:.35rem}
     .form-group label{font-family:var(--font-ui);font-size:.65rem;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:var(--muted)}
     .form-group input,.form-group select,.form-group textarea{background:var(--charcoal);border:1px solid var(--border);color:var(--white);font-family:var(--font-body);font-size:.95rem;padding:.6rem .85rem;outline:none;border-radius:0;transition:border-color .2s;-webkit-appearance:none}
@@ -320,7 +461,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
     .save-btn:hover{background:var(--teal)}
     .danger-btn{font-family:var(--font-ui);font-size:.8rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:#ff6b6b;background:transparent;border:1px solid rgba(255,107,107,.3);cursor:pointer;padding:.6rem 1.25rem;transition:all .2s;margin-left:.5rem}
     .danger-btn:hover{background:#ff6b6b;color:var(--black)}
-    .primary-btn{font-family:var(--font-ui);font-size:.85rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:.75rem 1.5rem;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);margin-bottom:1.5rem;display:inline-block}
+    .primary-btn{font-family:var(--font-ui);font-size:.85rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:.75rem 1.5rem;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);margin-bottom:1.5rem;display:inline-block;text-decoration:none}
     .tier-form{margin-bottom:.75rem;background:var(--charcoal);border:1px solid var(--border);padding:1rem}
     .tier-form-row{display:grid;grid-template-columns:140px 100px 100px 1fr auto;align-items:end;gap:1rem}
     .tier-form-name{font-family:var(--font-display);font-size:1.3rem;letter-spacing:.05em;align-self:end;padding-bottom:.4rem}
@@ -337,13 +478,42 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
     .upload-row{display:flex;gap:.75rem;align-items:end}
     .upload-btn{font-family:var(--font-ui);font-size:.75rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--black);background:var(--purple);border:none;cursor:pointer;padding:.6rem 1rem;white-space:nowrap}
     .upload-status{font-family:var(--font-ui);font-size:.7rem;font-weight:600;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-top:.35rem}
-    .revenue-section{margin-bottom:1.5rem}
     .revenue-header{font-family:var(--font-display);font-size:1.2rem;letter-spacing:.05em;color:var(--cyan);margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
     .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
     .modal.open{display:flex}
     .modal-box{background:var(--surface);border:1px solid var(--border);padding:2rem;width:100%;max-width:600px;max-height:90vh;overflow-y:auto}
     .modal-title{font-family:var(--font-display);font-size:1.8rem;letter-spacing:.05em;margin-bottom:1.5rem}
     .modal-close{float:right;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer}
+    .pl-summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.5rem}
+    .pl-card{padding:1rem;border-radius:4px;border:1px solid var(--border)}
+    .pl-card-blue{background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.2)}
+    .pl-card-amber{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.2)}
+    .pl-card-green{background:rgba(74,222,128,.08);border-color:rgba(74,222,128,.2)}
+    .pl-card-label{font-family:var(--font-ui);font-size:.65rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:.35rem}
+    .pl-card-val{font-family:var(--font-display);font-size:1.8rem;letter-spacing:.05em;color:var(--cyan)}
+    .pl-card-amber .pl-card-val{color:#fbbf24}
+    .pl-card-green .pl-card-val{color:#4ade80}
+    .pl-toggle-row{display:flex;align-items:center;gap:.75rem;margin-bottom:1.5rem}
+    .pl-toggle{position:relative;width:40px;height:22px;display:inline-block}
+    .pl-toggle input{opacity:0;width:0;height:0}
+    .pl-slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#2a2a38;border-radius:22px;transition:.3s}
+    .pl-slider:before{position:absolute;content:"";height:16px;width:16px;left:3px;bottom:3px;background:#666;border-radius:50%;transition:.3s}
+    .pl-toggle input:checked+.pl-slider{background:#166534}
+    .pl-toggle input:checked+.pl-slider:before{transform:translateX(18px);background:#4ade80}
+    .pl-section{background:var(--surface);border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
+    .pl-section-title{font-family:var(--font-ui);font-size:.7rem;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+    .pl-row-head{display:grid;grid-template-columns:1fr 80px 160px 100px;gap:.5rem;margin-bottom:.5rem}
+    .pl-row-head span{font-family:var(--font-ui);font-size:.6rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#444}
+    .pl-row{display:grid;grid-template-columns:1fr 80px 160px 100px;gap:.5rem;align-items:center;margin-bottom:.5rem}
+    .pl-row label{font-family:var(--font-ui);font-size:.8rem;font-weight:600;color:var(--muted)}
+    .pl-row input{background:var(--charcoal);border:1px solid var(--border);color:var(--white);font-family:var(--font-body);font-size:.85rem;padding:.4rem .6rem;outline:none;width:100%}
+    .pl-row input:focus{border-color:var(--cyan)}
+    .pl-computed{background:var(--charcoal);border:1px solid var(--border);padding:.4rem .6rem;font-family:var(--font-ui);font-size:.9rem;font-weight:600;color:var(--teal);text-align:right}
+    .pl-neg{color:#f87171}
+    .pl-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}
+    .pl-total-row span{font-family:var(--font-ui);font-size:.75rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--white)}
+    .pl-total{font-family:var(--font-display);font-size:1.4rem;letter-spacing:.05em;color:var(--teal)}
+    .pl-exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem}
     @media print{header,.sidebar,.no-print{display:none!important}.layout{grid-template-columns:1fr}.print-area{display:block!important}.screen-only{display:none!important}body{background:white;color:black}table{font-size:12px}th,td{border:1px solid #ccc;padding:6px}}
     .print-area{display:none}
   </style>
@@ -365,6 +535,8 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       <a href="/admin?s=events&event=${eid}" class="nav-link ${section==='events'?'active':''}">Events & Tiers</a>
       <a href="/admin?s=tickets&event=${eid}" class="nav-link ${section==='tickets'?'active':''}">Ticket Sales</a>
       <a href="/admin?s=doorlist&event=${eid}" class="nav-link ${section==='doorlist'?'active':''}">Door List</a>
+      <p class="nav-section">Finance</p>
+      <a href="/admin?s=pl" class="nav-link ${section==='pl'?'active':''}">P&L Tracker</a>
       <p class="nav-section">Store</p>
       <a href="/admin?s=store" class="nav-link ${section==='store'?'active':''}">Products</a>
       <p class="nav-section">Site</p>
@@ -396,6 +568,27 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
           </div>
           ${salesCards}
         </div>
+        ${allPL.length > 0 ? `
+        <div class="card">
+          <p class="section-title">P&L Year-to-Date</p>
+          <div class="stats-grid">
+            <div class="stat-card highlight">
+              <div class="stat-label">Total Revenue</div>
+              <div class="stat-num">$${(plYearRevenue/100).toFixed(0)}</div>
+              <div class="stat-sub">across ${allPL.length} show${allPL.length!==1?'s':''}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Net Profit</div>
+              <div class="stat-num" style="color:${plYearNet>=0?'var(--teal)':'#f87171'}">${plYearNet>=0?'+':'-'}$${Math.abs(plYearNet/100).toFixed(0)}</div>
+              <div class="stat-sub">after all expenses</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Attendance</div>
+              <div class="stat-num">${plYearAttendance}</div>
+              <div class="stat-sub">across all shows</div>
+            </div>
+          </div>
+        </div>` : ''}
       ` : ''}
 
       ${section==='reports' ? `
@@ -432,9 +625,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       ${section==='events' ? `
         <h1 class="page-title">Events & Tiers</h1>
         <p class="page-sub">Manage show details, posters, and ticket pricing</p>
-
         <button class="primary-btn no-print" onclick="document.getElementById('addEventModal').classList.add('open')">+ Add New Event</button>
-
         ${currentEvent ? `
         <div class="card">
           <p class="section-title">Event Details</p>
@@ -457,21 +648,16 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
               <label>Show Poster</label>
               <div class="upload-row">
                 <input type="text" name="poster_url" id="posterUrl" value="${currentEvent.poster_url||''}" placeholder="Paste URL or upload below" style="flex:1" />
-                <label class="upload-btn" style="cursor:pointer">
-                  Upload Image
-                  <input type="file" accept="image/*" style="display:none" onchange="uploadFile(this,'posterUrl','posterStatus')" />
-                </label>
+                <label class="upload-btn" style="cursor:pointer">Upload Image<input type="file" accept="image/*" style="display:none" onchange="uploadFile(this,'posterUrl','posterStatus')" /></label>
               </div>
               <div class="upload-status" id="posterStatus"></div>
               ${currentEvent.poster_url ? `<img src="${currentEvent.poster_url}" style="width:80px;height:120px;object-fit:cover;border:1px solid var(--border);margin-top:.5rem" />` : ''}
             </div>
-
             <button type="submit" class="save-btn">Save Event</button>
           </form>
-          <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets? This cannot be undone.')">
+          <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets?')">
             <input type="hidden" name="id" value="${currentEvent.id}" />
             <button type="submit" class="danger-btn">Delete Event</button>
-          </form>
           </form>
         </div>
         <div class="card">
@@ -515,6 +701,52 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
         </div>
       ` : ''}
 
+      ${section==='pl' ? `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
+          <div>
+            <h1 class="page-title">P&L Tracker</h1>
+            <p class="page-sub">Show-by-show profit & loss · rolling annual view</p>
+          </div>
+          <a href="/admin?s=pl" class="primary-btn" style="margin-bottom:0">+ New P&L</a>
+        </div>
+        ${allPL.length > 0 ? `
+        <div class="card" style="margin-bottom:1.5rem">
+          <p class="section-title">Year-to-Date Summary</p>
+          <div class="stats-grid" style="margin-bottom:1rem">
+            <div class="stat-card highlight">
+              <div class="stat-label">Total Revenue</div>
+              <div class="stat-num">$${(plYearRevenue/100).toFixed(0)}</div>
+              <div class="stat-sub">${allPL.length} show${allPL.length!==1?'s':''}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Expenses</div>
+              <div class="stat-num" style="color:#fbbf24">$${(plYearExpenses/100).toFixed(0)}</div>
+              <div class="stat-sub">all shows combined</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Net Profit</div>
+              <div class="stat-num" style="color:${plYearNet>=0?'var(--teal)':'#f87171'}">${plYearNet>=0?'+':'-'}$${Math.abs(plYearNet/100).toFixed(0)}</div>
+              <div class="stat-sub">after all expenses</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Attendance</div>
+              <div class="stat-num">${plYearAttendance}</div>
+              <div class="stat-sub">across all shows</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Show</th><th>Date</th><th>Revenue</th><th>Expenses</th><th>Net</th><th>Attendance</th></tr></thead>
+              <tbody>${plHistoryRows}</tbody>
+            </table>
+          </div>
+        </div>` : ''}
+        <div class="card">
+          <p class="section-title">${currentPL ? 'Edit: ' + currentPL.show_name : 'New Show P&L'}</p>
+          ${plEditorHTML(currentPL)}
+        </div>
+      ` : ''}
+
       ${section==='store' ? `
         <h1 class="page-title">Products</h1>
         <p class="page-sub">Manage your merch store</p>
@@ -523,7 +755,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
           <div class="table-wrap">
             <table>
               <thead><tr><th>Image</th><th>Product</th><th>Price</th><th>Stock</th><th>Actions</th></tr></thead>
-              <tbody>${productRows||'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">No products yet — add your first one!</td></tr>'}</tbody>
+              <tbody>${productRows||'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:2rem">No products yet</td></tr>'}</tbody>
             </table>
           </div>
         </div>
@@ -547,7 +779,6 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
             <div class="form-group" style="margin-bottom:1.5rem">
               <label>Highlight Reel URL</label>
               <input type="text" name="highlight_video" value="${settings.highlight_video||''}" placeholder="YouTube or Vimeo URL" />
-              <div class="upload-status" style="margin-top:.35rem">Paste a YouTube or Vimeo link — embeds as the homepage highlight reel</div>
             </div>
             <p class="section-title" style="margin-top:1.5rem">Announcement Banner</p>
             <div class="form-row">
@@ -565,9 +796,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       ` : ''}
 
     </main>
-  </div>
-
-  <!-- Add Event Modal -->
+  </div><!-- Add Event Modal -->
   <div class="modal" id="addEventModal">
     <div class="modal-box">
       <button class="modal-close" onclick="document.getElementById('addEventModal').classList.remove('open')">✕</button>
@@ -578,7 +807,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
           <div class="form-group"><label>Date</label><input type="text" name="date" placeholder="TBA" /></div>
           <div class="form-group"><label>Venue</label><input type="text" name="venue" placeholder="TBA" /></div>
         </div>
-        <p style="font-family:var(--font-ui);font-size:.7rem;color:var(--muted);margin-bottom:1rem;letter-spacing:.1em">Default ticket tiers will be created automatically. You can edit prices and capacities after.</p>
+        <p style="font-family:var(--font-ui);font-size:.7rem;color:var(--muted);margin-bottom:1rem;letter-spacing:.1em">Default ticket tiers will be created automatically.</p>
         <button type="submit" class="save-btn">Create Event</button>
       </form>
     </div>
@@ -600,28 +829,19 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
           <label>Product Image</label>
           <div class="upload-row">
             <input type="text" name="image_url" id="productImageUrl" placeholder="Paste URL or upload" style="flex:1" />
-            <label class="upload-btn" style="cursor:pointer">
-              Upload
-              <input type="file" accept="image/*" style="display:none" onchange="uploadFile(this,'productImageUrl','productImageStatus')" />
-            </label>
+            <label class="upload-btn" style="cursor:pointer">Upload<input type="file" accept="image/*" style="display:none" onchange="uploadFile(this,'productImageUrl','productImageStatus')" /></label>
           </div>
           <div class="upload-status" id="productImageStatus"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Stripe Price ID</label><input type="text" name="stripe_price_id" id="productStripe" placeholder="price_..." /></div>
           <div class="form-group"><label>Stock Status</label>
-            <select name="in_stock" id="productStock">
-              <option value="1">In Stock</option>
-              <option value="0">Out of Stock</option>
-            </select>
+            <select name="in_stock" id="productStock"><option value="1">In Stock</option><option value="0">Out of Stock</option></select>
           </div>
-          <div class="form-group"><label>Featured on Homepage</label>
-            <select name="featured" id="productFeatured">
-              <option value="0">No</option>
-              <option value="1">Yes — show on homepage</option>
-            </select>
+          <div class="form-group"><label>Featured</label>
+            <select name="featured" id="productFeatured"><option value="0">No</option><option value="1">Yes</option></select>
           </div>
-          <div class="form-group"><label>Stock Quantity (-1 = unlimited)</label>
+          <div class="form-group"><label>Stock Qty (-1 = unlimited)</label>
             <input type="number" name="stock_quantity" id="productStock_qty" value="-1" min="-1" />
           </div>
         </div>
@@ -631,6 +851,82 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
   </div>
 
   <script>
+    function g(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+    function fmt(n) {
+      const abs = Math.abs(n);
+      const s = '$' + abs.toLocaleString('en-CA', {minimumFractionDigits:0,maximumFractionDigits:0});
+      return n < 0 ? '-' + s : s;
+    }
+    function setEl(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    function plCalc() {
+      const t1 = g('t1q') * g('t1p');
+      const t2 = g('t2q') * g('t2p');
+      const t3 = g('t3q') * g('t3p');
+      const t4 = g('t4q') * g('t4p');
+      setEl('t1r', fmt(t1)); setEl('t2r', fmt(t2)); setEl('t3r', fmt(t3)); setEl('t4r', fmt(t4));
+      const ticketTotal = t1+t2+t3+t4;
+      setEl('ticket-total', fmt(ticketTotal));
+      const attendance = g('t1q')+g('t2q')+g('t3q')+g('t4q');
+
+      const shP = g('shq')*(g('shs')-g('shc'));
+      const ceP = g('ceq')*(g('ces')-g('cec'));
+      const crP = g('crq')*(g('crs')-g('crc'));
+      const cbC = -(g('cbq')*g('cbc'));
+      setEl('sh-profit', fmt(shP)); setEl('ce-profit', fmt(ceP)); setEl('cr-profit', fmt(crP)); setEl('cb-cost', fmt(cbC));
+      const merchTotal = shP+ceP+crP+cbC;
+      setEl('merch-total', fmt(merchTotal));
+
+      const alcoholOn = document.getElementById('alcoholToggle')?.checked;
+      const alcoholSec = document.getElementById('alcoholSection');
+      if (alcoholSec) alcoholSec.style.display = alcoholOn ? 'block' : 'none';
+      let alcoholNet = 0;
+      if (alcoholOn) {
+        const bP = g('bq')*(g('bs')-g('bc'));
+        const sopC = -g('sopc');
+        setEl('b-profit', fmt(bP)); setEl('sop-cost', fmt(sopC));
+        alcoholNet = bP+sopC;
+        setEl('alcohol-total', fmt(alcoholNet));
+      }
+
+      const expenses = g('ex-venue')+g('ex-talent')+g('ex-truck')+g('ex-prod')+g('ex-staff')+g('ex-graphics')+g('ex-ring')+g('ex-chairs')+g('ex-lighting')+g('ex-audio')+g('ex-drape')+g('ex-other');
+      setEl('exp-total', fmt(-expenses));
+
+      const totalRevenue = ticketTotal+merchTotal+alcoholNet;
+      const net = totalRevenue - expenses;
+
+      setEl('s-revenue', fmt(totalRevenue));
+      setEl('s-expenses', fmt(expenses));
+      setEl('s-attendance', attendance);
+
+      const netEl = document.getElementById('s-net');
+      const netTotal = document.getElementById('net-total');
+      if (netEl) { netEl.textContent = fmt(net); netEl.style.color = net >= 0 ? '#4ade80' : '#f87171'; }
+      if (netTotal) { netTotal.textContent = fmt(net); netTotal.style.color = net >= 0 ? 'var(--teal)' : '#f87171'; }
+
+      const setHidden = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+      setHidden('plNetProfit', Math.round(net * 100));
+      setHidden('plTotalRevenue', Math.round(totalRevenue * 100));
+      setHidden('plTotalExpenses', Math.round(expenses * 100));
+      setHidden('plAttendance', attendance);
+    }
+
+    function prepPLSubmit() {
+      const keys = ['t1q','t1p','t2q','t2p','t3q','t3p','t4q','t4p','shq','shs','shc','ceq','ces','cec','crq','crs','crc','cbq','cbc','bq','bs','bc','sopc','ex-venue','ex-talent','ex-truck','ex-prod','ex-staff','ex-graphics','ex-ring','ex-chairs','ex-lighting','ex-audio','ex-drape','ex-other'];
+      const data = { alcohol_on: document.getElementById('alcoholToggle')?.checked || false };
+      keys.forEach(k => {
+        const el = document.getElementById(k);
+        if (el) data[k.replace(/-/g,'_')] = parseFloat(el.value) || 0;
+      });
+      const jsonEl = document.getElementById('plDataJson');
+      if (jsonEl) jsonEl.value = JSON.stringify(data);
+    }
+
+    if (document.getElementById('t1q')) { plCalc(); }
+
     async function uploadFile(input, urlFieldId, statusId) {
       var file = input.files[0];
       if (!file) return;
@@ -655,7 +951,7 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       }
     }
 
-    function editProduct(id, name, desc, priceCents, stripe, image, inStock, featured) {
+    function editProduct(id, name, desc, priceCents, stripe, image, inStock) {
       document.getElementById('productModalTitle').textContent = 'Edit Product';
       document.getElementById('productForm').action = '/admin?action=update-product';
       document.getElementById('productId').value = id;
@@ -665,7 +961,6 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       document.getElementById('productStripe').value = stripe;
       document.getElementById('productImageUrl').value = image;
       document.getElementById('productStock').value = inStock;
-      document.getElementById('productFeatured').value = featured || 0;
       document.getElementById('addProductModal').classList.add('open');
     }
 
@@ -673,18 +968,11 @@ function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByT
       document.getElementById('addProductModal').classList.remove('open');
       document.getElementById('productModalTitle').textContent = 'Add Product';
       document.getElementById('productForm').action = '/admin?action=add-product';
-      document.getElementById('productId').value = '';
-      document.getElementById('productName').value = '';
-      document.getElementById('productDesc').value = '';
-      document.getElementById('productPrice').value = '';
-      document.getElementById('productStripe').value = '';
-      document.getElementById('productImageUrl').value = '';
+      ['productId','productName','productDesc','productPrice','productStripe','productImageUrl'].forEach(id => { document.getElementById(id).value = ''; });
     }
 
     document.querySelectorAll('.modal').forEach(function(m) {
-      m.addEventListener('click', function(e) {
-        if (e.target === m) m.classList.remove('open');
-      });
+      m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('open'); });
     });
   </script>
 </body>
