@@ -34,9 +34,18 @@ export async function onRequestGet(context) {
     let currentPL = null;
     if (plId) {
       currentPL = allPL.find(p => p.id == plId) || null;
+    } else if (section === 'pl' && eid) {
+      currentPL = allPL.find(p => p.event_id == eid) || null;
     }
 
-    return new Response(adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settingsMap, ticketRevenue, productRevenue, allTickets, allPL, currentPL), {
+    let plTicketTypes = [];
+    if (currentPL && currentPL.event_id) {
+      plTicketTypes = (await db.prepare("SELECT * FROM ticket_types WHERE event_id = ?").bind(currentPL.event_id).all()).results ?? [];
+    } else if (section === 'pl') {
+      plTicketTypes = ticketTypes;
+    }
+
+    return new Response(adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settingsMap, ticketRevenue, productRevenue, allTickets, allPL, currentPL, plTicketTypes), {
       headers: { 'Content-Type': 'text/html' }
     });
 
@@ -79,6 +88,8 @@ export async function onRequestPost(context) {
       const video_url = body.get('video_url') || '';
       await db.prepare("UPDATE events SET name=?,date=?,venue=?,active=?,poster_url=?,video_url=? WHERE id=?")
         .bind(name, date, venue, active, poster_url, video_url, id).run();
+      await db.prepare("UPDATE show_pl SET show_name=?,show_date=? WHERE event_id=?")
+        .bind(name, date, id).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + id } });
     }
 
@@ -88,8 +99,8 @@ export async function onRequestPost(context) {
       const venue = body.get('venue') || 'TBA';
       const result = await db.prepare("INSERT INTO events (name, date, venue, active) VALUES (?, ?, ?, 0)").bind(name, date, venue).run();
       const newId = result.meta?.last_row_id || 1;
-      await db.prepare("INSERT INTO ticket_types (event_id, name, price_cents, capacity) VALUES (?,?,?,?),(?,?,?,?),(?,?,?,?),(?,?,?,?)")
-        .bind(newId,'Ringside',3500,40, newId,'Row 2',3500,40, newId,'Row 3',3500,40, newId,'General Admission',2750,150).run();
+      await db.prepare("INSERT INTO show_pl (show_name, show_date, event_id, data_json, net_profit, total_revenue, total_expenses, attendance) VALUES (?,?,?,?,0,0,0,0)")
+        .bind(name, date, newId, '{}').run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + newId } });
     }
 
@@ -97,6 +108,7 @@ export async function onRequestPost(context) {
       const id = body.get('id');
       await db.prepare("DELETE FROM tickets WHERE event_id=?").bind(id).run();
       await db.prepare("DELETE FROM ticket_types WHERE event_id=?").bind(id).run();
+      await db.prepare("DELETE FROM show_pl WHERE event_id=?").bind(id).run();
       await db.prepare("DELETE FROM events WHERE id=?").bind(id).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=events' } });
     }
@@ -109,6 +121,23 @@ export async function onRequestPost(context) {
       const stripe_price_id = body.get('stripe_price_id') || '';
       await db.prepare("UPDATE ticket_types SET price_cents=?,capacity=?,stripe_price_id=? WHERE id=?")
         .bind(price, capacity, stripe_price_id, id).run();
+      return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + eventId } });
+    }
+
+    if (action === 'add-tier') {
+      const eventId = body.get('event_id');
+      const name = body.get('name') || 'New Tier';
+      const price = Math.round(parseFloat(body.get('price') || '0') * 100);
+      const capacity = parseInt(body.get('capacity') || '50');
+      await db.prepare("INSERT INTO ticket_types (event_id, name, price_cents, capacity) VALUES (?,?,?,?)")
+        .bind(eventId, name, price, capacity).run();
+      return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + eventId } });
+    }
+
+    if (action === 'delete-tier') {
+      const id = body.get('id');
+      const eventId = body.get('event_id');
+      await db.prepare("DELETE FROM ticket_types WHERE id=?").bind(id).run();
       return new Response('', { status: 302, headers: { 'Location': '/admin?s=events&event=' + eventId } });
     }
 
@@ -160,6 +189,7 @@ export async function onRequestPost(context) {
       const id = body.get('id') || '';
       const show_name = body.get('show_name') || '';
       const show_date = body.get('show_date') || '';
+      const event_id = body.get('event_id') || null;
       const data_json = body.get('data_json') || '{}';
       const net_profit = parseInt(body.get('net_profit') || '0');
       const total_revenue = parseInt(body.get('total_revenue') || '0');
@@ -171,8 +201,8 @@ export async function onRequestPost(context) {
           .bind(show_name, show_date, data_json, net_profit, total_revenue, total_expenses, attendance, id).run();
         return new Response('', { status: 302, headers: { 'Location': '/admin?s=pl&pl=' + id } });
       } else {
-        const result = await db.prepare("INSERT INTO show_pl (show_name,show_date,data_json,net_profit,total_revenue,total_expenses,attendance) VALUES (?,?,?,?,?,?,?)")
-          .bind(show_name, show_date, data_json, net_profit, total_revenue, total_expenses, attendance).run();
+        const result = await db.prepare("INSERT INTO show_pl (show_name,show_date,event_id,data_json,net_profit,total_revenue,total_expenses,attendance) VALUES (?,?,?,?,?,?,?,?)")
+          .bind(show_name, show_date, event_id, data_json, net_profit, total_revenue, total_expenses, attendance).run();
         const newId = result.meta?.last_row_id || '';
         return new Response('', { status: 302, headers: { 'Location': '/admin?s=pl&pl=' + newId } });
       }
@@ -227,17 +257,35 @@ export async function onRequestPost(context) {
 </html>`;
 }
 
-function plEditorHTML(pl) {
+function plEditorHTML(pl, plTicketTypes) {
   const d = pl ? JSON.parse(pl.data_json || '{}') : {};
   const v = (key, def) => d[key] !== undefined ? d[key] : def;
+
+  const ticketRows = plTicketTypes.map((tt) => {
+    const key = 'tt_' + tt.id;
+    const qKey = key + '_sold';
+    const pKey = key + '_price';
+    const defaultPrice = (tt.price_cents / 100).toFixed(2);
+    return `<div class="pl-row" data-tier-id="${tt.id}">
+      <label>${tt.name}</label>
+      <input type="number" id="${qKey}" value="${v(qKey, 0)}" onchange="plCalc()" placeholder="Sold" />
+      <input type="number" id="${pKey}" value="${v(pKey, defaultPrice)}" onchange="plCalc()" placeholder="Price" />
+      <div class="pl-computed" id="${key}_rev">$0</div>
+    </div>`;
+  }).join('');
+
+  const tierIdsJson = JSON.stringify(plTicketTypes.map(tt => ({ id: tt.id, name: tt.name, defaultPrice: (tt.price_cents/100).toFixed(2) })));
+
   return `
   <form method="POST" action="/admin?action=save-pl" id="plForm">
     <input type="hidden" name="id" value="${pl ? pl.id : ''}" />
+    <input type="hidden" name="event_id" value="${pl ? (pl.event_id || '') : ''}" />
     <input type="hidden" name="data_json" id="plDataJson" value="" />
     <input type="hidden" name="net_profit" id="plNetProfit" value="0" />
     <input type="hidden" name="total_revenue" id="plTotalRevenue" value="0" />
     <input type="hidden" name="total_expenses" id="plTotalExpenses" value="0" />
     <input type="hidden" name="attendance" id="plAttendance" value="0" />
+    <input type="hidden" id="plTierIds" value='${tierIdsJson}' />
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
       <div class="form-group">
@@ -264,29 +312,91 @@ function plEditorHTML(pl) {
 
     <div class="pl-section">
       <div class="pl-section-title">🎟 Ticket Revenue</div>
-      <div class="pl-row-head"><span>Tier</span><span>Qty</span><span>Price</span><span>Revenue</span></div>
-      <div class="pl-row"><label>Balcony / Cassette</label><input type="number" id="t1q" value="${v('t1q',22)}" onchange="plCalc()" /><input type="number" id="t1p" value="${v('t1p',40)}" onchange="plCalc()" /><div class="pl-computed" id="t1r">$0</div></div>
-      <div class="pl-row"><label>Floor VIP (seated)</label><input type="number" id="t2q" value="${v('t2q',76)}" onchange="plCalc()" /><input type="number" id="t2p" value="${v('t2p',35)}" onchange="plCalc()" /><div class="pl-computed" id="t2r">$0</div></div>
-      <div class="pl-row"><label>GA Seated</label><input type="number" id="t3q" value="${v('t3q',62)}" onchange="plCalc()" /><input type="number" id="t3p" value="${v('t3p',30)}" onchange="plCalc()" /><div class="pl-computed" id="t3r">$0</div></div>
-      <div class="pl-row"><label>GA Standing</label><input type="number" id="t4q" value="${v('t4q',40)}" onchange="plCalc()" /><input type="number" id="t4p" value="${v('t4p',27.50)}" onchange="plCalc()" /><div class="pl-computed" id="t4r">$0</div></div>
+      <div class="pl-row-head"><span>Tier</span><span>Sold</span><span>Price</span><span>Revenue</span></div>
+      ${ticketRows || '<p style="color:var(--muted);font-size:.8rem">No ticket tiers set up yet. Add tiers in Events & Tiers first.</p>'}
       <div class="pl-total-row"><span>Ticket Total</span><div class="pl-total" id="ticket-total">$0</div></div>
     </div>
 
     <div class="pl-section">
       <div class="pl-section-title">👕 Merch</div>
-      <div class="pl-row-head"><span>Item</span><span>Qty</span><span>Sell / Cost</span><span>Profit</span></div>
-      <div class="pl-row"><label>T-Shirts</label><input type="number" id="shq" value="${v('shq',30)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="shs" value="${v('shs',30)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="shc" value="${v('shc',10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="sh-profit">$0</div></div>
-      <div class="pl-row"><label>Event Cassette</label><input type="number" id="ceq" value="${v('ceq',20)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="ces" value="${v('ces',8)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="cec" value="${v('cec',2)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="ce-profit">$0</div></div>
-      <div class="pl-row"><label>Regular Cassette</label><input type="number" id="crq" value="${v('crq',20)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="crs" value="${v('crs',5)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="crc" value="${v('crc',1.10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="cr-profit">$0</div></div>
-      <div class="pl-row"><label>Bundled Cassette Cost</label><input type="number" id="cbq" value="${v('cbq',22)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="cbc" value="${v('cbc',1.10)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed pl-neg" id="cb-cost">$0</div></div>
-      <div class="pl-total-row"><span>Merch Total</span><div class="pl-total" id="merch-total">$0</div></div>
+      <div class="pl-row-head"><span>Item</span><span>Produced / Sold</span><span>Sell / Cost</span><span>Net</span></div>
+      <div class="pl-row">
+        <label>T-Shirts</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="sh-produced" value="${v('sh_produced',60)}" onchange="plCalc()" placeholder="Made" />
+          <input type="number" id="sh-sold" value="${v('sh_sold',30)}" onchange="plCalc()" placeholder="Sold" />
+        </div>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="sh-sell" value="${v('sh_sell',30)}" onchange="plCalc()" placeholder="Sell $" />
+          <input type="number" id="sh-cost" value="${v('sh_cost',10)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed" id="sh-net">$0</div>
+      </div>
+      <div style="font-family:var(--font-ui);font-size:.65rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.1em">Revenue on sold units minus total production cost (all units produced)</div>
+      <div class="pl-row">
+        <label>Event Cassette</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="ce-produced" value="${v('ce_produced',20)}" onchange="plCalc()" placeholder="Made" />
+          <input type="number" id="ce-sold" value="${v('ce_sold',20)}" onchange="plCalc()" placeholder="Sold" />
+        </div>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="ce-sell" value="${v('ce_sell',8)}" onchange="plCalc()" placeholder="Sell $" />
+          <input type="number" id="ce-cost" value="${v('ce_cost',2)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed" id="ce-net">$0</div>
+      </div>
+      <div class="pl-row">
+        <label>Regular Cassette</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="cr-produced" value="${v('cr_produced',20)}" onchange="plCalc()" placeholder="Made" />
+          <input type="number" id="cr-sold" value="${v('cr_sold',20)}" onchange="plCalc()" placeholder="Sold" />
+        </div>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="cr-sell" value="${v('cr_sell',5)}" onchange="plCalc()" placeholder="Sell $" />
+          <input type="number" id="cr-cost" value="${v('cr_cost',1.10)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed" id="cr-net">$0</div>
+      </div>
+      <div class="pl-row">
+        <label>Bundled Cassette</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="cb-produced" value="${v('cb_produced',22)}" onchange="plCalc()" placeholder="Qty" />
+          <input type="number" style="visibility:hidden" />
+        </div>
+        <div style="display:flex;gap:4px">
+          <input type="number" style="visibility:hidden" />
+          <input type="number" id="cb-cost" value="${v('cb_cost',1.10)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed pl-neg" id="cb-net">$0</div>
+      </div>
+      <div class="pl-total-row"><span>Merch Net</span><div class="pl-total" id="merch-total">$0</div></div>
     </div>
 
     <div class="pl-section" id="alcoholSection" style="display:none">
       <div class="pl-section-title">🍺 Alcohol</div>
-      <div class="pl-row-head"><span>Item</span><span>Units</span><span>Sell / Cost</span><span>Profit</span></div>
-      <div class="pl-row"><label>Beer Sold</label><input type="number" id="bq" value="${v('bq',150)}" onchange="plCalc()" /><div style="display:flex;gap:4px"><input type="number" id="bs" value="${v('bs',8)}" onchange="plCalc()" placeholder="Sell" /><input type="number" id="bc" value="${v('bc',1.83)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed" id="b-profit">$0</div></div>
-      <div class="pl-row"><label>SOP Permit</label><input type="number" id="sopq" value="1" style="visibility:hidden" /><div style="display:flex;gap:4px"><input type="number" id="sopc" value="${v('sopc',100)}" onchange="plCalc()" placeholder="Cost" /></div><div class="pl-computed pl-neg" id="sop-cost">$0</div></div>
+      <div class="pl-row-head"><span>Item</span><span>Bought / Sold</span><span>Sell / Cost</span><span>Net</span></div>
+      <div class="pl-row">
+        <label>Beer</label>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="b-bought" value="${v('b_bought',200)}" onchange="plCalc()" placeholder="Bought" />
+          <input type="number" id="b-sold" value="${v('b_sold',150)}" onchange="plCalc()" placeholder="Sold" />
+        </div>
+        <div style="display:flex;gap:4px">
+          <input type="number" id="b-sell" value="${v('b_sell',8)}" onchange="plCalc()" placeholder="Sell $" />
+          <input type="number" id="b-cost" value="${v('b_cost',1.83)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed" id="b-net">$0</div>
+      </div>
+      <div style="font-family:var(--font-ui);font-size:.65rem;color:var(--muted);margin-bottom:.75rem;letter-spacing:.1em">Revenue on sold units minus cost of ALL units bought</div>
+      <div class="pl-row">
+        <label>SOP Permit</label>
+        <div style="display:flex;gap:4px"><input style="visibility:hidden" /><input style="visibility:hidden" /></div>
+        <div style="display:flex;gap:4px">
+          <input style="visibility:hidden" />
+          <input type="number" id="sop-cost" value="${v('sop_cost',100)}" onchange="plCalc()" placeholder="Cost $" />
+        </div>
+        <div class="pl-computed pl-neg" id="sop-net">$0</div>
+      </div>
       <div class="pl-total-row"><span>Alcohol Net</span><div class="pl-total" id="alcohol-total">$0</div></div>
     </div>
 
@@ -316,10 +426,9 @@ function plEditorHTML(pl) {
 
     <div style="margin-top:1.5rem;display:flex;gap:1rem;align-items:center">
       <button type="submit" class="save-btn" onclick="prepPLSubmit()">💾 Save P&L</button>
-      ${pl ? `<form method="POST" action="/admin?action=delete-pl" style="display:inline" onsubmit="return confirm('Delete this P&L?')"><input type="hidden" name="id" value="${pl.id}" /><button type="submit" class="danger-btn">Delete</button></form>` : ''}
     </div>
   </form>`;
-}function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settings, ticketRevenue, productRevenue, allTickets, allPL, currentPL) {
+}function adminPage(section, events, currentEvent, ticketTypes, tickets, salesByTier, products, settings, ticketRevenue, productRevenue, allTickets, allPL, currentPL, plTicketTypes) {
   const eid = currentEvent?.id || '';
   const eventOptions = events.map(e => `<option value="${e.id}" ${e.id==eid?'selected':''}>${e.name}</option>`).join('');
   const totalRevenue = ticketRevenue + productRevenue;
@@ -340,7 +449,6 @@ function plEditorHTML(pl) {
     const sold = t.sold||0;
     const remaining = t.capacity-sold;
     const pct = t.capacity > 0 ? Math.round((sold/t.capacity)*100) : 0;
-    const price = (t.price_cents/100).toFixed(2);
     const revenue = ((t.price_cents*sold)/100).toFixed(2);
     return `<div class="stat-card">
       <div class="stat-label">${t.name}</div>
@@ -360,6 +468,11 @@ function plEditorHTML(pl) {
         <div class="form-group"><label>Capacity</label><input type="number" name="capacity" value="${t.capacity}" min="0" /></div>
         <div class="form-group"><label>Stripe Price ID</label><input type="text" name="stripe_price_id" value="${t.stripe_price_id||''}" placeholder="price_..." /></div>
         <button type="submit" class="save-btn">Save</button>
+        <form method="POST" action="/admin?action=delete-tier" style="display:inline" onsubmit="return confirm('Delete ${t.name} tier?')">
+          <input type="hidden" name="id" value="${t.id}" />
+          <input type="hidden" name="event_id" value="${t.event_id}" />
+          <button type="submit" class="danger-btn" style="margin-left:0">✕</button>
+        </form>
       </div>
     </form>`).join('');
 
@@ -463,7 +576,7 @@ function plEditorHTML(pl) {
     .danger-btn:hover{background:#ff6b6b;color:var(--black)}
     .primary-btn{font-family:var(--font-ui);font-size:.85rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--black);background:var(--cyan);border:none;cursor:pointer;padding:.75rem 1.5rem;clip-path:polygon(8px 0%,100% 0%,calc(100% - 8px) 100%,0% 100%);margin-bottom:1.5rem;display:inline-block;text-decoration:none}
     .tier-form{margin-bottom:.75rem;background:var(--charcoal);border:1px solid var(--border);padding:1rem}
-    .tier-form-row{display:grid;grid-template-columns:140px 100px 100px 1fr auto;align-items:end;gap:1rem}
+    .tier-form-row{display:grid;grid-template-columns:140px 100px 100px 1fr auto auto;align-items:end;gap:.75rem}
     .tier-form-name{font-family:var(--font-display);font-size:1.3rem;letter-spacing:.05em;align-self:end;padding-bottom:.4rem}
     .table-wrap{overflow-x:auto}
     table{width:100%;border-collapse:collapse;font-family:var(--font-ui);font-size:.85rem}
@@ -502,18 +615,20 @@ function plEditorHTML(pl) {
     .pl-toggle input:checked+.pl-slider:before{transform:translateX(18px);background:#4ade80}
     .pl-section{background:var(--surface);border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
     .pl-section-title{font-family:var(--font-ui);font-size:.7rem;font-weight:700;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
-    .pl-row-head{display:grid;grid-template-columns:1fr 80px 160px 100px;gap:.5rem;margin-bottom:.5rem}
+    .pl-row-head{display:grid;grid-template-columns:1fr 140px 160px 100px;gap:.5rem;margin-bottom:.5rem}
     .pl-row-head span{font-family:var(--font-ui);font-size:.6rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#444}
-    .pl-row{display:grid;grid-template-columns:1fr 80px 160px 100px;gap:.5rem;align-items:center;margin-bottom:.5rem}
+    .pl-row{display:grid;grid-template-columns:1fr 140px 160px 100px;gap:.5rem;align-items:center;margin-bottom:.5rem}
     .pl-row label{font-family:var(--font-ui);font-size:.8rem;font-weight:600;color:var(--muted)}
     .pl-row input{background:var(--charcoal);border:1px solid var(--border);color:var(--white);font-family:var(--font-body);font-size:.85rem;padding:.4rem .6rem;outline:none;width:100%}
     .pl-row input:focus{border-color:var(--cyan)}
     .pl-computed{background:var(--charcoal);border:1px solid var(--border);padding:.4rem .6rem;font-family:var(--font-ui);font-size:.9rem;font-weight:600;color:var(--teal);text-align:right}
-    .pl-neg{color:#f87171}
+    .pl-neg{color:#f87171 !important}
     .pl-total-row{display:flex;justify-content:space-between;align-items:center;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border)}
     .pl-total-row span{font-family:var(--font-ui);font-size:.75rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--white)}
     .pl-total{font-family:var(--font-display);font-size:1.4rem;letter-spacing:.05em;color:var(--teal)}
     .pl-exp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.75rem;margin-bottom:1rem}
+    .add-tier-form{background:var(--charcoal);border:1px dashed var(--border);padding:1rem;margin-top:1rem}
+    .add-tier-row{display:grid;grid-template-columns:1fr 100px 100px auto;align-items:end;gap:.75rem}
     @media print{header,.sidebar,.no-print{display:none!important}.layout{grid-template-columns:1fr}.print-area{display:block!important}.screen-only{display:none!important}body{background:white;color:black}table{font-size:12px}th,td{border:1px solid #ccc;padding:6px}}
     .print-area{display:none}
   </style>
@@ -536,7 +651,7 @@ function plEditorHTML(pl) {
       <a href="/admin?s=tickets&event=${eid}" class="nav-link ${section==='tickets'?'active':''}">Ticket Sales</a>
       <a href="/admin?s=doorlist&event=${eid}" class="nav-link ${section==='doorlist'?'active':''}">Door List</a>
       <p class="nav-section">Finance</p>
-      <a href="/admin?s=pl" class="nav-link ${section==='pl'?'active':''}">P&L Tracker</a>
+      <a href="/admin?s=pl&event=${eid}" class="nav-link ${section==='pl'?'active':''}">P&L Tracker</a>
       <p class="nav-section">Store</p>
       <a href="/admin?s=store" class="nav-link ${section==='store'?'active':''}">Products</a>
       <p class="nav-section">Site</p>
@@ -544,7 +659,7 @@ function plEditorHTML(pl) {
     </nav>
     <main class="main">
 
-      ${['dashboard','tickets','doorlist','events'].includes(section) ? `
+      ${['dashboard','tickets','doorlist','events','pl'].includes(section) ? `
       <div class="event-selector no-print">
         <label>Viewing Event:</label>
         <select onchange="window.location.href='/admin?s=${section}&event='+this.value">
@@ -605,11 +720,6 @@ function plEditorHTML(pl) {
             <div class="stat-num">$${(ticketRevenue/100).toFixed(2)}</div>
             <div class="stat-sub">from ticket sales</div>
           </div>
-          <div class="stat-card">
-            <div class="stat-label">Merch Revenue</div>
-            <div class="stat-num">$0.00</div>
-            <div class="stat-sub">coming soon</div>
-          </div>
         </div>
         <div class="card">
           <div class="revenue-header">Tickets by Event</div>
@@ -655,14 +765,26 @@ function plEditorHTML(pl) {
             </div>
             <button type="submit" class="save-btn">Save Event</button>
           </form>
-          <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets?')">
+          <form method="POST" action="/admin?action=delete-event" style="margin-top:1rem" onsubmit="return confirm('Delete this event and ALL its tickets and P&L?')">
             <input type="hidden" name="id" value="${currentEvent.id}" />
             <button type="submit" class="danger-btn">Delete Event</button>
           </form>
         </div>
         <div class="card">
           <p class="section-title">Ticket Tiers</p>
-          ${tierForms}
+          ${tierForms || '<p style="color:var(--muted);font-size:.85rem;margin-bottom:1rem">No tiers yet — add one below.</p>'}
+          <div class="add-tier-form">
+            <p style="font-family:var(--font-ui);font-size:.65rem;font-weight:700;letter-spacing:.25em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem">Add New Tier</p>
+            <form method="POST" action="/admin?action=add-tier">
+              <input type="hidden" name="event_id" value="${eid}" />
+              <div class="add-tier-row">
+                <div class="form-group"><label>Tier Name</label><input type="text" name="name" placeholder="e.g. Balcony VIP" required /></div>
+                <div class="form-group"><label>Price ($)</label><input type="number" name="price" step="0.50" min="0" placeholder="35.00" /></div>
+                <div class="form-group"><label>Capacity</label><input type="number" name="capacity" min="1" placeholder="50" /></div>
+                <button type="submit" class="save-btn" style="align-self:end">+ Add</button>
+              </div>
+            </form>
+          </div>
         </div>` : '<p style="color:var(--muted)">No events found. Add one above!</p>'}
       ` : ''}
 
@@ -702,13 +824,8 @@ function plEditorHTML(pl) {
       ` : ''}
 
       ${section==='pl' ? `
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
-          <div>
-            <h1 class="page-title">P&L Tracker</h1>
-            <p class="page-sub">Show-by-show profit & loss · rolling annual view</p>
-          </div>
-          <a href="/admin?s=pl" class="primary-btn" style="margin-bottom:0">+ New P&L</a>
-        </div>
+        <h1 class="page-title">P&L Tracker</h1>
+        <p class="page-sub">${currentEvent?.name||''} · projected & actual financials</p>
         ${allPL.length > 0 ? `
         <div class="card" style="margin-bottom:1.5rem">
           <p class="section-title">Year-to-Date Summary</p>
@@ -742,8 +859,8 @@ function plEditorHTML(pl) {
           </div>
         </div>` : ''}
         <div class="card">
-          <p class="section-title">${currentPL ? 'Edit: ' + currentPL.show_name : 'New Show P&L'}</p>
-          ${plEditorHTML(currentPL)}
+          <p class="section-title">${currentPL ? currentPL.show_name + ' — P&L' : 'No P&L yet'}</p>
+          ${currentPL ? plEditorHTML(currentPL, plTicketTypes) : `<p style="color:var(--muted);font-family:var(--font-ui);font-size:.85rem">No P&L for this event yet. Create a new event to auto-generate one.</p>`}
         </div>
       ` : ''}
 
@@ -796,24 +913,22 @@ function plEditorHTML(pl) {
       ` : ''}
 
     </main>
-  </div><!-- Add Event Modal -->
-  <div class="modal" id="addEventModal">
+  </div><div class="modal" id="addEventModal">
     <div class="modal-box">
       <button class="modal-close" onclick="document.getElementById('addEventModal').classList.remove('open')">✕</button>
       <div class="modal-title">Add New Event</div>
       <form method="POST" action="/admin?action=add-event">
-        <div class="form-group" style="margin-bottom:1rem"><label>Event Name</label><input type="text" name="name" placeholder="Vol. 2 — ..." required /></div>
+        <div class="form-group" style="margin-bottom:1rem"><label>Event Name</label><input type="text" name="name" placeholder="miXtape Wrestling Vol. 1" required /></div>
         <div class="form-row">
           <div class="form-group"><label>Date</label><input type="text" name="date" placeholder="TBA" /></div>
           <div class="form-group"><label>Venue</label><input type="text" name="venue" placeholder="TBA" /></div>
         </div>
-        <p style="font-family:var(--font-ui);font-size:.7rem;color:var(--muted);margin-bottom:1rem;letter-spacing:.1em">Default ticket tiers will be created automatically.</p>
-        <button type="submit" class="save-btn">Create Event</button>
+        <p style="font-family:var(--font-ui);font-size:.7rem;color:var(--muted);margin-bottom:1rem;letter-spacing:.1em">A P&L will be automatically created and linked to this event. Add your ticket tiers after creating the event.</p>
+        <button type="submit" class="save-btn">Create Event + P&L</button>
       </form>
     </div>
   </div>
 
-  <!-- Add/Edit Product Modal -->
   <div class="modal" id="addProductModal">
     <div class="modal-box">
       <button class="modal-close" onclick="closeProductModal()">✕</button>
@@ -857,50 +972,73 @@ function plEditorHTML(pl) {
       const s = '$' + abs.toLocaleString('en-CA', {minimumFractionDigits:0,maximumFractionDigits:0});
       return n < 0 ? '-' + s : s;
     }
-    function setEl(id, val) {
+    function setEl(id, val, isNeg) {
       const el = document.getElementById(id);
-      if (el) el.textContent = val;
+      if (!el) return;
+      el.textContent = val;
+      if (isNeg !== undefined) {
+        if (isNeg) el.classList.add('pl-neg'); else el.classList.remove('pl-neg');
+      }
     }
 
     function plCalc() {
-      const t1 = g('t1q') * g('t1p');
-      const t2 = g('t2q') * g('t2p');
-      const t3 = g('t3q') * g('t3p');
-      const t4 = g('t4q') * g('t4p');
-      setEl('t1r', fmt(t1)); setEl('t2r', fmt(t2)); setEl('t3r', fmt(t3)); setEl('t4r', fmt(t4));
-      const ticketTotal = t1+t2+t3+t4;
+      const tierData = JSON.parse(document.getElementById('plTierIds')?.value || '[]');
+      let ticketTotal = 0;
+      let attendance = 0;
+      tierData.forEach(tt => {
+        const sold = g('tt_' + tt.id + '_sold');
+        const price = g('tt_' + tt.id + '_price');
+        const rev = sold * price;
+        ticketTotal += rev;
+        attendance += sold;
+        setEl('tt_' + tt.id + '_rev', fmt(rev));
+      });
       setEl('ticket-total', fmt(ticketTotal));
-      const attendance = g('t1q')+g('t2q')+g('t3q')+g('t4q');
+      setEl('s-attendance', attendance);
 
-      const shP = g('shq')*(g('shs')-g('shc'));
-      const ceP = g('ceq')*(g('ces')-g('cec'));
-      const crP = g('crq')*(g('crs')-g('crc'));
-      const cbC = -(g('cbq')*g('cbc'));
-      setEl('sh-profit', fmt(shP)); setEl('ce-profit', fmt(ceP)); setEl('cr-profit', fmt(crP)); setEl('cb-cost', fmt(cbC));
-      const merchTotal = shP+ceP+crP+cbC;
-      setEl('merch-total', fmt(merchTotal));
+      const calcMerch = (pfx) => {
+        const produced = g(pfx+'-produced');
+        const sold = g(pfx+'-sold');
+        const sell = g(pfx+'-sell');
+        const cost = g(pfx+'-cost');
+        return (sold * sell) - (produced * cost);
+      };
+      const shNet = calcMerch('sh');
+      const ceNet = calcMerch('ce');
+      const crNet = calcMerch('cr');
+      const cbNet = -(g('cb-produced') * g('cb-cost'));
+      setEl('sh-net', fmt(shNet), shNet < 0);
+      setEl('ce-net', fmt(ceNet), ceNet < 0);
+      setEl('cr-net', fmt(crNet), crNet < 0);
+      setEl('cb-net', fmt(cbNet));
+      const merchTotal = shNet + ceNet + crNet + cbNet;
+      setEl('merch-total', fmt(merchTotal), merchTotal < 0);
 
       const alcoholOn = document.getElementById('alcoholToggle')?.checked;
       const alcoholSec = document.getElementById('alcoholSection');
       if (alcoholSec) alcoholSec.style.display = alcoholOn ? 'block' : 'none';
       let alcoholNet = 0;
       if (alcoholOn) {
-        const bP = g('bq')*(g('bs')-g('bc'));
-        const sopC = -g('sopc');
-        setEl('b-profit', fmt(bP)); setEl('sop-cost', fmt(sopC));
-        alcoholNet = bP+sopC;
-        setEl('alcohol-total', fmt(alcoholNet));
+        const bBought = g('b-bought');
+        const bSold = g('b-sold');
+        const bSell = g('b-sell');
+        const bCost = g('b-cost');
+        const bNet = (bSold * bSell) - (bBought * bCost);
+        const sopNet = -g('sop-cost');
+        setEl('b-net', fmt(bNet), bNet < 0);
+        setEl('sop-net', fmt(sopNet));
+        alcoholNet = bNet + sopNet;
+        setEl('alcohol-total', fmt(alcoholNet), alcoholNet < 0);
       }
 
       const expenses = g('ex-venue')+g('ex-talent')+g('ex-truck')+g('ex-prod')+g('ex-staff')+g('ex-graphics')+g('ex-ring')+g('ex-chairs')+g('ex-lighting')+g('ex-audio')+g('ex-drape')+g('ex-other');
       setEl('exp-total', fmt(-expenses));
 
-      const totalRevenue = ticketTotal+merchTotal+alcoholNet;
+      const totalRevenue = ticketTotal + merchTotal + alcoholNet;
       const net = totalRevenue - expenses;
 
       setEl('s-revenue', fmt(totalRevenue));
       setEl('s-expenses', fmt(expenses));
-      setEl('s-attendance', attendance);
 
       const netEl = document.getElementById('s-net');
       const netTotal = document.getElementById('net-total');
@@ -915,9 +1053,14 @@ function plEditorHTML(pl) {
     }
 
     function prepPLSubmit() {
-      const keys = ['t1q','t1p','t2q','t2p','t3q','t3p','t4q','t4p','shq','shs','shc','ceq','ces','cec','crq','crs','crc','cbq','cbc','bq','bs','bc','sopc','ex-venue','ex-talent','ex-truck','ex-prod','ex-staff','ex-graphics','ex-ring','ex-chairs','ex-lighting','ex-audio','ex-drape','ex-other'];
+      const tierData = JSON.parse(document.getElementById('plTierIds')?.value || '[]');
       const data = { alcohol_on: document.getElementById('alcoholToggle')?.checked || false };
-      keys.forEach(k => {
+      tierData.forEach(tt => {
+        data['tt_' + tt.id + '_sold'] = g('tt_' + tt.id + '_sold');
+        data['tt_' + tt.id + '_price'] = g('tt_' + tt.id + '_price');
+      });
+      const fields = ['sh-produced','sh-sold','sh-sell','sh-cost','ce-produced','ce-sold','ce-sell','ce-cost','cr-produced','cr-sold','cr-sell','cr-cost','cb-produced','cb-cost','b-bought','b-sold','b-sell','b-cost','sop-cost','ex-venue','ex-talent','ex-truck','ex-prod','ex-staff','ex-graphics','ex-ring','ex-chairs','ex-lighting','ex-audio','ex-drape','ex-other'];
+      fields.forEach(k => {
         const el = document.getElementById(k);
         if (el) data[k.replace(/-/g,'_')] = parseFloat(el.value) || 0;
       });
@@ -925,7 +1068,7 @@ function plEditorHTML(pl) {
       if (jsonEl) jsonEl.value = JSON.stringify(data);
     }
 
-    if (document.getElementById('t1q')) { plCalc(); }
+    if (document.getElementById('plTierIds')) { plCalc(); }
 
     async function uploadFile(input, urlFieldId, statusId) {
       var file = input.files[0];
