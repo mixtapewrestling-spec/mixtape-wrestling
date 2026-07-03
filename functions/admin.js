@@ -458,23 +458,21 @@ function plEditorHTML(pl, plTicketTypes) {
     </div>`;
   }).join('');
 
-  const tierForms = ticketTypes.map(t => `
-    <form method="POST" action="/admin?action=update-tier&event=${eid}" class="tier-form">
-      <input type="hidden" name="id" value="${t.id}" />
-      <input type="hidden" name="event_id" value="${t.event_id}" />
-      <div class="tier-form-row">
-        <div class="tier-form-name">${t.name}</div>
-        <div class="form-group"><label>Price ($)</label><input type="number" name="price" value="${(t.price_cents/100).toFixed(2)}" step="0.50" min="0" /></div>
-        <div class="form-group"><label>Capacity</label><input type="number" name="capacity" value="${t.capacity}" min="0" /></div>
-        <div class="form-group"><label>Stripe Price ID</label><input type="text" name="stripe_price_id" value="${t.stripe_price_id||''}" placeholder="price_..." /></div>
-        <button type="submit" class="save-btn">Save</button>
-        <form method="POST" action="/admin?action=delete-tier" style="display:inline" onsubmit="return confirm('Delete ${t.name} tier?')">
-          <input type="hidden" name="id" value="${t.id}" />
-          <input type="hidden" name="event_id" value="${t.event_id}" />
-          <button type="submit" class="danger-btn" style="margin-left:0">✕</button>
-        </form>
-      </div>
-    </form>`).join('');
+   const tierForms = ticketTypes.map(t => `
+    <div class="tier-form">
+      <form method="POST" action="/admin?action=update-tier&event=${eid}">
+        <input type="hidden" name="id" value="${t.id}" />
+        <input type="hidden" name="event_id" value="${t.event_id}" />
+        <div class="tier-form-row">
+          <div class="tier-form-name">${t.name}</div>
+          <div class="form-group"><label>Price ($)</label><input type="number" name="price" value="${(t.price_cents/100).toFixed(2)}" step="0.50" min="0" /></div>
+          <div class="form-group"><label>Capacity</label><input type="number" name="capacity" value="${t.capacity}" min="0" /></div>
+          <div class="form-group"><label>Stripe Price ID</label><input type="text" name="stripe_price_id" value="${t.stripe_price_id||''}" placeholder="price_..." /></div>
+          <button type="submit" class="save-btn">Save</button>
+          <button type="button" class="danger-btn" style="margin-left:0" onclick="deleteTier(${t.id}, ${t.event_id}, '${t.name}')">✕</button>
+        </div>
+      </form>
+    </div>`).join('');
 
   const ticketRows = tickets.map((t,i) => `
     <tr>
@@ -1117,6 +1115,16 @@ function plEditorHTML(pl, plTicketTypes) {
     document.querySelectorAll('.modal').forEach(function(m) {
       m.addEventListener('click', function(e) { if (e.target === m) m.classList.remove('open'); });
     });
+
+      function deleteTier(id, eventId, name) {
+      if (!confirm('Delete ' + name + ' tier?')) return;
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/admin?action=delete-tier';
+      form.innerHTML = '<input name="id" value="'+id+'"><input name="event_id" value="'+eventId+'">';
+      document.body.appendChild(form);
+      form.submit();
+    }
   </script>
 </body>
 </html>`;
